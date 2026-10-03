@@ -5,8 +5,10 @@ import androidx.activity.result.IntentSenderRequest
 import com.google.android.gms.auth.api.identity.BeginSignInRequest
 import com.google.android.gms.auth.api.identity.Identity
 import com.google.android.gms.auth.api.identity.SignInClient
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.tasks.await
 import tap.win.app.BuildConfig
 import tap.win.app.api.ApiClient
 import tap.win.app.api.AuthResponse
@@ -64,6 +66,51 @@ object GoogleSignInHelper {
             true
         } catch (e: Exception) {
             false
+        }
+    }
+
+    /**
+     * Completes the sign-in after the Google picker returns.
+     * [data] is the IntentSender result Intent; it carries the Google ID token,
+     * which we exchange with Firebase Auth and then with our backend session.
+     */
+    suspend fun finishSignIn(activity: Activity, data: android.content.Intent?): Result<AuthResponse> {
+        if (data == null) return Result.failure(Exception("لم يتم اختيار حساب Google"))
+        return try {
+            val credential = Identity.getSignInClient(activity)
+                .getCredentialFromIntent(data)
+            val idToken = credential?.idToken
+                ?: return Result.failure(Exception("تعذّر الحصول على رمز Google"))
+
+            // 1) Exchange the Google ID token for a Firebase user.
+            val firebaseUser = suspendCancellableCoroutine { cont ->
+                FirebaseAuth.getInstance()
+                    .signInWithCredential(GoogleAuthProvider.getCredential(idToken, null))
+                    .addOnSuccessListener { result -> cont.resume(result.user!!) }
+                    .addOnFailureListener { e -> cont.resumeWithException(e) }
+            }
+
+            // 2) Send the Firebase ID token to our backend to get a Tap Win session.
+            val firebaseToken = firebaseUser.getIdToken(true).await()
+            val response = ApiClient.authApi.firebaseLogin(
+                FirebaseLoginRequest(
+                    idToken = firebaseToken.token!!,
+                    deviceId = ApiClient.deviceId,
+                    deviceName = ApiClient.deviceName,
+                ),
+            )
+            if (response.isSuccessful && response.body() != null) {
+                Result.success(response.body()!!)
+            } else {
+                val err = runCatching {
+                    response.errorBody()?.string()?.let { body ->
+                        org.json.JSONObject(body).optString("error")
+                    }
+                }.getOrNull()
+                Result.failure(Exception(err ?: "فشل تسجيل الدخول عبر الخادم (${response.code()})"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
         }
     }
 

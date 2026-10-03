@@ -59,6 +59,11 @@ data class HeartbeatRequest(
     val platform: String = "android",
 )
 
+data class FcmTokenRequest(
+    @SerializedName("device_id") val deviceId: String,
+    @SerializedName("push_token") val pushToken: String,
+)
+
 data class FirebaseLoginRequest(
     @SerializedName("id_token") val idToken: String,
     @SerializedName("device_id") val deviceId: String,
@@ -102,6 +107,12 @@ interface AuthApi {
     suspend fun heartbeat(
         @Header("Authorization") auth: String,
         @Body body: HeartbeatRequest,
+    ): retrofit2.Response<Unit>
+
+    @POST("api/auth/fcm-token")
+    suspend fun uploadFcmToken(
+        @Header("Authorization") auth: String,
+        @Body body: FcmTokenRequest,
     ): retrofit2.Response<Unit>
 
     @POST("api/auth/event")

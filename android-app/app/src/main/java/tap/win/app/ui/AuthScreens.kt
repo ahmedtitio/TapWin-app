@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.window.Dialog
 import tap.win.app.api.ApiError
 import tap.win.app.api.ApiClient
@@ -28,6 +29,7 @@ import tap.win.app.api.ForgotRequest
 import tap.win.app.api.LoginRequest
 import tap.win.app.api.RegisterRequest
 import tap.win.app.api.ResetRequest
+import tap.win.app.notifications.TapWinMessagingService
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -163,6 +165,12 @@ fun AuthScreen(
     onModeChange: (AuthMode) -> Unit,
     onAuthenticated: (AuthResponse) -> Unit,
 ) {
+    val appCtx = LocalContext.current.applicationContext
+    val onAuthed: (AuthResponse) -> Unit = { resp ->
+        // Now that a session exists, upload the FCM push token for this device.
+        TapWinMessagingService.register(appCtx)
+        onAuthenticated(resp)
+    }
     GradientBackground {
         Column(
             modifier = Modifier
@@ -196,8 +204,8 @@ fun AuthScreen(
             Spacer(Modifier.height(28.dp))
 
             when (mode) {
-                AuthMode.Login -> LoginForm(onModeChange, onAuthenticated)
-                AuthMode.Register -> RegisterForm(onModeChange, onAuthenticated)
+                AuthMode.Login -> LoginForm(onModeChange, onAuthed)
+                AuthMode.Register -> RegisterForm(onModeChange, onAuthed)
                 AuthMode.Forgot -> ForgotForm(onModeChange)
             }
         }

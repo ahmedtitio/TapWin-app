@@ -2,18 +2,16 @@
 # Codemagic CI/CD configuration for "Tap Win" (tap.win.app)
 # Repo: https://github.com/ahmedtitio/TapWin-app
 #
-# Required environment variables (set them in the Codemagic UI,
-# Instance-based / Secure):
-#   CM_KEYSTORE            – base64 of your release keystore (.jks/.keystore)
+# Required env. variables (set in Codemagic UI, Instance-based):
+#   CM_KEYSTORE            – base64 of release keystore:
+#                            base64 -w0 tapwin-release.jks
 #   CM_KEYSTORE_PASSWORD   – keystore password
-#   CM_KEY_ALIAS           – key alias
+#   CM_KEY_ALIAS           – key alias  (tapwin-key)
 #   CM_KEY_PASSWORD        – key password
-#   API_BASE_URL           – Cloudflare Worker URL, e.g.
-#                            https://app-backend-api.<subdomain>.workers.dev
-#   GA_MEASUREMENT_ID      – GA4 id from Firebase console (G-XXXXXXXXXX)
-#   GOOGLE_WEB_CLIENT_ID   – Firebase console → Project settings → Auth →
-#                            Google provider → "Web client" id (GOCSPX-xxxx).
-#                            Required for "Sign in with Google".
+# Optional instance vars (defaults are baked in below):
+#   API_BASE_URL           – Cloudflare Worker URL
+#   GA_MEASUREMENT_ID      – GA4 id (G-XXXXXXXXXX)
+#   GOOGLE_WEB_CLIENT_ID   – Firebase OAuth Web client id
 # ============================================================
 
 workflows:
@@ -23,21 +21,25 @@ workflows:
     max_build_duration: 120
     environment:
       java: 17
-      android_signing: []          # we sign manually from CM_KEYSTORE env vars
       vars:
         PACKAGE_NAME: "tap.win.app"
-        API_BASE_URL: "https://app-backend-api.your-subdomain.workers.dev"
-        GA_MEASUREMENT_ID: ""
-        GOOGLE_WEB_CLIENT_ID: ""
-      groups:
-        - google_play              # optional: service account JSON for Play uploads
+        API_BASE_URL: "https://app-backend-api.tapwin.workers.dev"
+        GA_MEASUREMENT_ID: "G-9HBP87R04M"
+        GOOGLE_WEB_CLIENT_ID: "777921904281-9udm9ghsbn7r2f5dpu9h8a1sem2rq73u.apps.googleusercontent.com"
     scripts:
+      - name: Set up Android SDK
+        script: |
+          echo "ANDROID_SDK_ROOT=$CM_ANDROID_HOME" >> $CM_ENV
+          echo "ANDROID_HOME=$CM_ANDROID_HOME" >> $CM_ENV
       - name: Decode release keystore
         script: |
+          if [ -z "$CM_KEYSTORE" ]; then
+            echo "CM_KEYSTORE is not set – see comments at top of codemagic.yaml"; exit 1;
+          fi
           echo "$CM_KEYSTORE" | base64 --decode > $CM_BUILD_DIR/release.keystore
       - name: Build Release APK + AAB
-        working_dir: android-app
         script: |
+          cd $CM_CLONE_DIR/android-app
           chmod +x gradlew
           ./gradlew assembleRelease bundleRelease \
             -PAPI_BASE_URL="$API_BASE_URL" \
@@ -47,62 +49,20 @@ workflows:
             -Pandroid.injected.signing.store.password=$CM_KEYSTORE_PASSWORD \
             -Pandroid.injected.signing.key.alias=$CM_KEY_ALIAS \
             -Pandroid.injected.signing.key.password=$CM_KEY_PASSWORD
-      - name: Verify artifacts
+      - name: Stage artifacts
         script: |
-          ls -la android-app/app/build/outputs/apk/release/
-          ls -la android-app/app/build/outputs/bundle/release/
+          mkdir -p $CM_BUILD_DIR/output
+          cp android-app/app/build/outputs/apk/release/app-release.apk \
+             $CM_BUILD_DIR/output/TapWin-latest.apk
+          cp android-app/app/build/outputs/bundle/release/app-release.aab \
+             $CM_BUILD_DIR/output/TapWin-latest.aab
+          ls -la $CM_BUILD_DIR/output
     artifacts:
-      - android-app/app/build/outputs/apk/release/*.apk
-      - android-app/app/build/outputs/bundle/release/*.aab
+      - output/*.apk
+      - output/*.aab
+      - android-app/app/build/outputs/**
       - android-app/app/build/reports/**
     publishing:
       email:
         recipients:
-          - ahmedtitio@gmail.com   # change to your email
-
-  # Optional: publish directly to Google Play internal track.
-  # Requires the "google_play" integration (service account JSON) in Codemagic.
-  tap-win-play-upload:
-    name: Tap Win → Google Play (internal track)
-    instance_type: mac_mini_m2
-    max_build_duration: 120
-    environment:
-      java: 17
-      vars:
-        PACKAGE_NAME: "tap.win.app"
-        API_BASE_URL: "https://app-backend-api.your-subdomain.workers.dev"
-        GA_MEASUREMENT_ID: ""
-        GOOGLE_WEB_CLIENT_ID: ""
-      groups:
-        - google_play
-    scripts:
-      - name: Decode release keystore
-        script: |
-          echo "$CM_KEYSTORE" | base64 --decode > $CM_BUILD_DIR/release.keystore
-      - name: Build AAB
-        working_dir: android-app
-        script: |
-          chmod +x gradlew
-          ./gradlew bundleRelease \
-            -PAPI_BASE_URL="$API_BASE_URL" \
-            -PGA_MEASUREMENT_ID="$GA_MEASUREMENT_ID" \
-            -PGOOGLE_WEB_CLIENT_ID="$GOOGLE_WEB_CLIENT_ID" \
-            -Pandroid.injected.signing.store.file=$CM_BUILD_DIR/release.keystore \
-            -Pandroid.injected.signing.store.password=$CM_KEYSTORE_PASSWORD \
-            -Pandroid.injected.signing.key.alias=$CM_KEY_ALIAS \
-            -Pandroid.injected.signing.key.password=$CM_KEY_PASSWORD
-    after_publish:
-      - name: Upload AAB to Google Play (internal)
-        script: |
-          curl -sL https://dl.google.com/cloudsdk/google-cloud-sdk.tar.gz | tar xz -C $CM_BUILD_DIR
-          export PATH=$PATH:$CM_BUILD_DIR/google-cloud-sdk/bin
-          gcloud config set project tapwin-app
-          echo "$GCLOUD_SERVICE_ACCOUNT_JSON" > $CM_BUILD_DIR/key.json
-          gcloud auth activate-service-account --key-file=$CM_BUILD_DIR/key.json
-          java -jar $(curl -sL -o $CM_BUILD_DIR/appmanager.jar \
-            https://github.com/google/play-cli/releases/download/v3.9.5/play-publisher-3.9.5-shaded.jar || echo $CM_BUILD_DIR/appmanager.jar) \
-            upload --package_name=tap.win.app \
-            --tracks=internal \
-            --bundles=android-app/app/build/outputs/bundle/release/app-release.aab
-    artifacts:
-      - android-app/app/build/outputs/bundle/release/*.aab
+          - ahmedtitio@gmail.com

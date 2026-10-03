@@ -1,11 +1,16 @@
+# Dependencies
 node_modules/
-dist/
-.env
-.env.local
-.env.production
-*.log
+
+# Build artifacts and cache
 .wrangler/
-.dev.vars
-.cxx/
+dist/
 build/
-local.properties
+
+# Environment and secrets
+.env
+.dev.vars
+*.jks
+*.keystore
+
+# OS files
+.DS_Store

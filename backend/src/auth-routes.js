@@ -18,10 +18,17 @@ const pwIssue = (p) => {
 };
 
 async function storeRefreshToken(userId, token, deviceId) {
+  const hash = sha256(token);
+  // Upsert: if the same token is stored twice (e.g. retried request), update instead of failing on UNIQUE.
   await query(
     `INSERT INTO refresh_tokens (user_id, token_hash, device_id, expires_at)
-     VALUES ($1,$2,$3, now() + interval '30 days')`,
-    [userId, sha256(token), deviceId || null],
+     VALUES ($1,$2,$3, now() + interval '30 days')
+     ON CONFLICT (token_hash) DO UPDATE
+       SET user_id = EXCLUDED.user_id,
+           device_id = EXCLUDED.device_id,
+           expires_at = EXCLUDED.expires_at,
+           revoked_at = NULL`,
+    [userId, hash, deviceId || null],
   );
 }
 
@@ -74,8 +81,8 @@ router.post('/register', async (req, res) => {
 
     res.status(201).json({ user, tokens: { accessToken, refreshToken } });
   } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: 'SERVER_ERROR', message: 'حدث خطأ في الخادم' });
+    console.error('[register] error:', String(e?.stack || e).slice(0, 1000));
+    res.status(500).json({ error: 'SERVER_ERROR', message: 'حدث خطأ في الخادم', detail: String(e?.message || e).slice(0, 200) });
   }
 });
 
@@ -133,8 +140,8 @@ router.post('/login', async (req, res) => {
 
     res.json({ user: publicUser, tokens: { accessToken, refreshToken } });
   } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: 'SERVER_ERROR' });
+    console.error('[login] error:', String(e?.stack || e).slice(0, 1000));
+    res.status(500).json({ error: 'SERVER_ERROR', message: String(e?.message || e).slice(0, 200) });
   }
 });
 
@@ -469,14 +476,34 @@ router.post('/logout', async (req, res) => {
 // Called periodically by the Flutter app so the admin panel can show online status.
 router.post('/heartbeat', [authRequired('app')], async (req, res) => {
   try {
-    const { device_id, device_name, platform, app_version } = req.body || {};
+    const { device_id, device_name, platform, app_version, push_token } = req.body || {};
     if (!device_id) return res.status(400).json({ error: 'VALIDATION' });
     await query(
-      `INSERT INTO devices (user_id, device_id, device_name, platform, app_version, is_active, last_seen_at)
-       VALUES ($1,$2,$3,$4,$5,true, now())
+      `INSERT INTO devices (user_id, device_id, device_name, platform, app_version, push_token, is_active, last_seen_at)
+       VALUES ($1,$2,$3,$4,$5,$6,true, now())
        ON CONFLICT (device_id) DO UPDATE SET is_active=true, last_seen_at=now(),
-         device_name=COALESCE($3, devices.device_name), app_version=COALESCE($5, devices.app_version)`,
-      [req.user.id, device_id, device_name || null, platform || 'android', app_version || null],
+         device_name=COALESCE($3, devices.device_name), app_version=COALESCE($5, devices.app_version),
+         push_token=COALESCE($6, devices.push_token)`,
+      [req.user.id, device_id, device_name || null, platform || 'android', app_version || null, push_token || null],
+    );
+    res.json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'SERVER_ERROR' });
+  }
+});
+
+/* ---------------------- FCM TOKEN UPLOAD ------------------------------- */
+// Called by the app when Firebase Messaging issues/refreshes a device token.
+router.post('/fcm-token', [authRequired('app')], async (req, res) => {
+  try {
+    const { device_id, push_token } = req.body || {};
+    if (!device_id || !push_token) return res.status(400).json({ error: 'VALIDATION' });
+    await query(
+      `INSERT INTO devices (user_id, device_id, platform, push_token, is_active, last_seen_at)
+       VALUES ($1,$2,'android',$3,false,now())
+       ON CONFLICT (device_id) DO UPDATE SET push_token=$3, last_seen_at=now()`,
+      [req.user.id, device_id, push_token],
     );
     res.json({ ok: true });
   } catch (e) {

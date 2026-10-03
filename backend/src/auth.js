@@ -31,7 +31,7 @@ export function authRequired(audience) {
       const token = header.startsWith('Bearer ') ? header.slice(7) : null;
       if (!token) return res.status(401).json({ error: 'UNAUTHORIZED', message: 'لا يوجد توكن صالح' });
 
-      const payload = jwt.verify(token, SECRET(), { audience });
+      const payload = await jwt.verify(token, SECRET(), { audience });
       const { rows } = await query(
         'SELECT id, full_name, username, email, phone, role, is_active, avatar_url, last_login_at, created_at FROM users WHERE id=$1',
         [payload.sub],
