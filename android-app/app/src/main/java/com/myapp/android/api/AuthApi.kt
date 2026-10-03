@@ -89,6 +89,9 @@ interface AuthApi {
         @Body body: HeartbeatRequest,
     ): retrofit2.Response<Unit>
 
+    @POST("api/auth/event")
+    suspend fun trackEvent(@Body body: EventRequest): retrofit2.Response<Unit>
+
     @GET("api/auth/me")
     suspend fun me(@Header("Authorization") auth: String): retrofit2.Response<User>
 

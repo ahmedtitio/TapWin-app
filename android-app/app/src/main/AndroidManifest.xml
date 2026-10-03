@@ -27,5 +27,10 @@
         <service
             android:name=".data.PresenceService"
             android:exported="false" />
+
+        <!-- Google Analytics (GA4) measurement id, injected from gradle.properties / codemagic.yaml -->
+        <meta-data
+            android:name="google_analytics_measurement_id"
+            android:value="${GA_MEASUREMENT_ID}" />
     </application>
 </manifest>

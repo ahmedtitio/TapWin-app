@@ -54,6 +54,7 @@ export const resetPassword = (token, password) =>
 
 /* ------------------------------- Admin ------------------------------- */
 export const getStats = () => request('/api/admin/stats');
+export const getAnalytics = () => request('/api/admin/analytics');
 export const getUsers = ({ page = 1, limit = 20, search = '', status = '' } = {}) =>
   request(`/api/admin/users?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}&status=${status}`);
 export const getUserDetail = (id) => request(`/api/admin/users/${id}`);

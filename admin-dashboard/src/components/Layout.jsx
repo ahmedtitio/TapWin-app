@@ -5,6 +5,7 @@ import { clearSession, getUser } from '../lib/api';
 const NAV = [
   { to: '/', label: 'الرئيسية', icon: 'dashboard', end: true },
   { to: '/users', label: 'إدارة المستخدمين', icon: 'users' },
+  { to: '/analytics', label: 'إحصائيات التطبيق', icon: 'globe' },
   { to: '/activity', label: 'سجل النشاط', icon: 'activity' },
 ];
 

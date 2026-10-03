@@ -1,6 +1,8 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    // Google Services plugin reads app/google-services.json (Firebase)
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -16,6 +18,10 @@ android {
 
         // API base URL injected at build time (override in codemagic.yaml)
         buildConfigField("String", "API_BASE_URL", "\"${project.findProperty("API_BASE_URL") ?: "https://app-backend-api.your-subdomain.workers.dev"}\"")
+
+        // Google Analytics for Android — set GA_MEASUREMENT_ID in codemagic.yaml / gradle.properties
+        manifestPlaceholders["GA_MEASUREMENT_ID"] =
+            (project.findProperty("GA_MEASUREMENT_ID") ?: "").toString()
     }
 
     buildFeatures {
@@ -67,6 +73,12 @@ dependencies {
 
     // Secure token storage
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
+
+    // Firebase Auth (Google sign-in) + Google Analytics for Firebase
+    implementation(platform("com.google.firebase:firebase-bom:33.3.0"))
+    implementation("com.google.firebase:firebase-auth")
+    implementation("com.google.android.gms:play-services-auth:21.2.0")
+    implementation("com.google.firebase:firebase-analytics")
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")

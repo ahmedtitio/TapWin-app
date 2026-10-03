@@ -14,3 +14,6 @@ compatibility_flags = ["nodejs_compat"]
 
 [observability]
 enabled = true
+
+# Firebase Google sign-in: set your Firebase project id (used to verify ID tokens)
+FIREBASE_PROJECT_ID = "tapwin-app"

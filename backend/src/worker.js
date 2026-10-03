@@ -51,6 +51,7 @@ export default {
       process.env.ADMIN_EMAIL = env.ADMIN_EMAIL;
       process.env.ADMIN_PASSWORD = env.ADMIN_PASSWORD;
       process.env.APP_URL = env.APP_URL;
+      process.env.FIREBASE_PROJECT_ID = env.FIREBASE_PROJECT_ID;
       cached = buildApp(env);
       const sql = neon(cleanNeonUrl(env.DATABASE_URL));
       cached._migrating = migrateWithSql(sql, bcrypt)

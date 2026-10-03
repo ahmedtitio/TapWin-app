@@ -137,6 +137,144 @@ router.post('/login', async (req, res) => {
   }
 });
 
+/* --------------------- FIREBASE GOOGLE SIGN-IN ------------------------- */
+// The Android app gets an ID token from Firebase Auth (Google provider) and
+// exchanges it here for our own JWT session. Requires FIREBASE_PROJECT_ID env.
+async function verifyFirebaseIdToken(idToken) {
+  const projectId = process.env.FIREBASE_PROJECT_ID;
+  if (!projectId) throw new Error('FIREBASE_NOT_CONFIGURED');
+
+  // Decode header/payload without verifying first to get kid/aud/exp.
+  const decode = (part) => JSON.parse(Buffer.from(part, 'base64url').toString('utf8'));
+  const [header, payload] = idToken.split('.');
+  const h = decode(header);
+  const p = decode(payload);
+
+  if (h.alg !== 'RS256' || !h.kid) throw new Error('BAD_TOKEN_FORMAT');
+  if (p.aud !== projectId) throw new Error('BAD_AUDIENCE');
+  if (!p.exp || p.exp * 1000 < Date.now()) throw new Error('TOKEN_EXPIRED');
+  if (!p.email) throw new Error('NO_EMAIL');
+
+  // Fetch Google's public keys (cached ~10 min).
+  if (!verifyFirebaseIdToken._jwks || Date.now() > (verifyFirebaseIdToken._jwksAt || 0)) {
+    const res = await fetch('https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com');
+    const keys = await res.json();
+    verifyFirebaseIdToken._jwks = keys;
+    const cc = (res.headers.get('cache-control') || '').match(/max-age=(\d+)/);
+    verifyFirebaseIdToken._jwksAt = Date.now() + (cc ? Math.min(+cc[1], 600) * 1000 : 300000);
+  }
+  const pem = verifyFirebaseIdToken._jwks[h.kid];
+  if (!pem) throw new Error('UNKNOWN_KID');
+
+  const cryptoLib = await import('crypto');
+  const ok = cryptoLib.default.createVerify('RSA-SHA256')
+    .verify(pem, idToken.split('.').slice(0, 2).join('.'), 'base64url');
+  if (!ok) throw new Error('BAD_SIGNATURE');
+  return p;
+}
+
+router.post('/firebase', async (req, res) => {
+  try {
+    const { id_token, device_id, device_name, platform } = req.body || {};
+    if (!id_token) return res.status(400).json({ error: 'VALIDATION', message: 'رمز Firebase مفقود' });
+
+    let fp;
+    try {
+      fp = await verifyFirebaseIdToken(id_token);
+    } catch (e) {
+      if (e.message === 'FIREBASE_NOT_CONFIGURED')
+        return res.status(501).json({ error: 'FIREBASE_NOT_CONFIGURED', message: 'لم يتم إعداد Firebase على الخادم' });
+      return res.status(401).json({ error: 'INVALID_FIREBASE_TOKEN', message: 'تعذر التحقق من حساب Google' });
+    }
+
+    const email = String(fp.email).toLowerCase();
+    // Find by firebase uid -> by email (link account) -> create new user.
+    let { rows } = await query('SELECT * FROM users WHERE firebase_uid=$1', [fp.user_id]);
+    let user = rows[0];
+
+    if (!user) {
+      ({ rows } = await query('SELECT * FROM users WHERE email=$1', [email]));
+      user = rows[0];
+      if (user) {
+        await query('UPDATE users SET firebase_uid=$2 WHERE id=$1', [user.id, fp.user_id]);
+        user.firebase_uid = fp.user_id;
+      }
+    }
+
+    if (!user) {
+      const name = (fp.name || email.split('@')[0]).trim();
+      const base = (fp.email.split('@')[0] || 'user').replace(/[^a-zA-Z0-9._]/g, '').toLowerCase() || 'user';
+      let username = base, suffix = 1;
+      // ensure unique username
+      for (;;) {
+        const taken = await query('SELECT 1 FROM users WHERE username=$1', [username]);
+        if (!taken.rows.length) break;
+        username = `${base}${++suffix}`;
+      }
+      const randomHash = await hashPassword(crypto.randomBytes(24).toString('hex'));
+      ({ rows } = await query(
+        `INSERT INTO users (full_name, username, email, phone, password_hash, avatar_url, firebase_uid)
+         VALUES ($1,$2,$3,NULL,$5,$6,$7)
+         RETURNING id, full_name, username, email, phone, role, avatar_url, last_login_at`,
+        [name, username, email, null, randomHash, fp.picture || null, fp.user_id],
+      ));
+      user = rows[0];
+      await query(
+        `INSERT INTO login_logs (user_id, email, success, ip, user_agent) VALUES ($1,$2,true,$3,$4)`,
+        [user.id, email, clientIp(req), req.headers['user-agent'] || null],
+      ).catch(() => {});
+    }
+
+    if (!user.is_active) return res.status(403).json({ error: 'ACCOUNT_DISABLED', message: 'تم تعطيل هذا الحساب' });
+
+    await query('UPDATE users SET last_login_at=now(), failed_attempts=0, locked_until=NULL WHERE id=$1', [user.id]);
+
+    if (device_id) {
+      await query(
+        `INSERT INTO devices (user_id, device_id, device_name, platform, is_active, last_seen_at)
+         VALUES ($1,$2,$3,$4,true, now())
+         ON CONFLICT (device_id) DO UPDATE SET user_id=$1, is_active=true, last_seen_at=now()`,
+        [user.id, device_id, device_name || 'Android Device', platform || 'android'],
+      );
+    }
+
+    const publicUser = {
+      id: user.id, full_name: user.full_name, username: user.username, email: user.email,
+      phone: user.phone, role: user.role, avatar_url: user.avatar_url, last_login_at: user.last_login_at,
+    };
+    const accessToken = signAccessToken(publicUser, 'app');
+    const refreshToken = signRefreshToken();
+    await storeRefreshToken(user.id, refreshToken, device_id);
+    await logLogin(user.id, email, true, req);
+
+    res.json({ user: publicUser, tokens: { accessToken, refreshToken } });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'SERVER_ERROR' });
+  }
+});
+
+/* ---------------------------- APP ANALYTICS ---------------------------- */
+// Lightweight event ingestion from the Android app (Google Analytics is also
+// wired on the client; this gives the admin dashboard first-party stats too).
+router.post('/event', authRequired('app'), async (req, res) => {
+  try {
+    const { event, device_id, platform, props } = req.body || {};
+    if (!event || typeof event !== 'string' || event.length > 64)
+      return res.status(400).json({ error: 'VALIDATION' });
+    await query(
+      `INSERT INTO app_events (user_id, event, device_id, platform, props)
+       VALUES ($1,$2,$3,$4,$5)`,
+      [req.user.id, event, device_id || null, platform || 'android',
+       JSON.stringify(props && typeof props === 'object' ? props : {})],
+    );
+    res.json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'SERVER_ERROR' });
+  }
+});
+
 /* ---------------------------- FORGOT PASSWORD -------------------------- */
 router.post('/forgot-password', async (req, res) => {
   try {

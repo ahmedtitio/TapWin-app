@@ -178,6 +178,43 @@ router.delete('/devices/:deviceId', async (req, res) => {
   } catch (e) { console.error(e); res.status(500).json({ error: 'SERVER_ERROR' }); }
 });
 
+/* ------------------------- APP ANALYTICS (GA-like) ---------------------- */
+// First-party analytics from the Android app's /api/auth/event stream,
+// rendered in the dashboard "Analytics" page.
+router.get('/analytics', async (req, res) => {
+  try {
+    const [{ rows: totals }] = await Promise.all([
+      query(`SELECT
+        COUNT(*) FILTER (WHERE created_at > now() - interval '1 day')::int AS events_24h,
+        COUNT(DISTINCT user_id) FILTER (WHERE created_at > now() - interval '1 day')::int AS dau,
+        COUNT(DISTINCT user_id) FILTER (WHERE created_at > now() - interval '7 days')::int AS wau,
+        COUNT(*)::int AS events_total
+      FROM app_events`),
+    ]);
+
+    const { rows: daily } = await query(`
+      SELECT to_char(date_trunc('day', created_at),'YYYY-MM-DD') AS day, COUNT(*)::int AS events,
+             COUNT(DISTINCT user_id)::int AS users
+      FROM app_events WHERE created_at > now() - interval '14 days' GROUP BY 1 ORDER BY 1`);
+
+    const { rows: topEvents } = await query(`
+      SELECT event, COUNT(*)::int AS n, COUNT(DISTINCT user_id)::int AS users
+      FROM app_events WHERE created_at > now() - interval '7 days'
+      GROUP BY event ORDER BY n DESC LIMIT 10`);
+
+    const { rows: platforms } = await query(`
+      SELECT COALESCE(platform,'unknown') AS platform, COUNT(DISTINCT device_id)::int AS devices
+      FROM app_events WHERE created_at > now() - interval '30 days' GROUP BY 1`);
+
+    const { rows: recent } = await query(`
+      SELECT e.event, e.platform, e.created_at, u.full_name, u.username
+      FROM app_events e LEFT JOIN users u ON u.id=e.user_id
+      ORDER BY e.created_at DESC LIMIT 30`);
+
+    res.json({ totals: totals[0], daily, top_events: topEvents, platforms, recent });
+  } catch (e) { console.error(e); res.status(500).json({ error: 'SERVER_ERROR' }); }
+});
+
 /* ------------------------------ ACTIVITY -------------------------------- */
 router.get('/activity', async (req, res) => {
   try {
