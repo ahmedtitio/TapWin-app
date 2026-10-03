@@ -59,7 +59,7 @@ fun HomeScreen(session: SessionStore, user: User, onLogout: () -> Unit) {
                         onLogout()
                     }
                 }) {
-                    Icon(Icons.Filled.Logout, contentDescription = "خروج", tint = Color(0xFFFF8FA3))
+                    Icon(Icons.Filled.ExitToApp, contentDescription = "خروج", tint = Color(0xFFFF8FA3))
                 }
             }
 
@@ -100,19 +100,19 @@ fun HomeScreen(session: SessionStore, user: User, onLogout: () -> Unit) {
             ) {
                 NavigationBarItem(
                     selected = tab == 0, onClick = { tab = 0 },
-                    icon = { Icon3D(Icons.Filled.Dashboard, listOf(Brand, Accent), size = 34) },
+                    icon = { Icon3D(icon = Icons.Filled.Home, colors = listOf(Brand, Accent), size = 34) },
                     label = { Text("الرئيسية", color = Color.White.copy(alpha = 0.7f)) },
                     colors = NavigationBarItemDefaults.colors(indicatorColor = Brand.copy(alpha = 0.2f)),
                 )
                 NavigationBarItem(
                     selected = tab == 1, onClick = { tab = 1 },
-                    icon = { Icon3D(Icons.Filled.Person, listOf(Color(0xFFF5A623), Color(0xFFF55B42)), size = 34) },
+                    icon = { Icon3D(icon = Icons.Filled.Person, colors = listOf(Color(0xFFF5A623), Color(0xFFF55B42)), size = 34) },
                     label = { Text("الملف", color = Color.White.copy(alpha = 0.7f)) },
                     colors = NavigationBarItemDefaults.colors(indicatorColor = Brand.copy(alpha = 0.2f)),
                 )
                 NavigationBarItem(
                     selected = tab == 2, onClick = { tab = 2 },
-                    icon = { Icon3D(Icons.Filled.Shield, listOf(Color(0xFF2BC0E4), Brand), size = 34) },
+                    icon = { Icon3D(icon = Icons.Filled.Lock, colors = listOf(Color(0xFF2BC0E4), Brand), size = 34) },
                     label = { Text("الأمان", color = Color.White.copy(alpha = 0.7f)) },
                     colors = NavigationBarItemDefaults.colors(indicatorColor = Brand.copy(alpha = 0.2f)),
                 )
@@ -150,9 +150,9 @@ private fun StatTile(title: String, value: String, icon: androidx.compose.ui.gra
 private fun OverviewTab(user: User) {
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         StatTile("البريد الإلكتروني", user.email, Icons.Filled.MailOutline, listOf(Brand, Color(0xFFB543F5)))
-        StatTile("اسم المستخدم", "@${user.username}", Icons.Filled.Badge, listOf(Accent, Color(0xFF00A3FF)))
-        StatTile("حالة الاتصال", "نشط — إرسال نبضات دورية", Icons.Filled.Wifi, listOf(Color(0xFFF5A623), Color(0xFFF55B42)))
-        StatTile("تاريخ الانضمام", user.lastLoginAt?.take(10) ?: "-", Icons.Filled.CalendarMonth, listOf(Color(0xFF2BC0E4), Brand))
+        StatTile("اسم المستخدم", "@${user.username}", Icons.Filled.AccountCircle, listOf(Accent, Color(0xFF00A3FF)))
+        StatTile("حالة الاتصال", "نشط — إرسال نبضات دورية", Icons.Filled.SettingsRemote, listOf(Color(0xFFF5A623), Color(0xFFF55B42)))
+        StatTile("تاريخ الانضمام", user.lastLoginAt?.take(10) ?: "-", Icons.Filled.DateRange, listOf(Color(0xFF2BC0E4), Brand))
     }
 }
 
@@ -170,7 +170,7 @@ private fun ProfileTab(
             AuthTextField(phone, onPhone, "رقم الهاتف", Icons.Filled.Phone,
                 keyboardType = androidx.compose.ui.text.input.KeyboardType.Phone)
             Spacer(Modifier.height(14.dp))
-            GradientButton(text = "حفظ التغييرات") { onSave(name, phone) }
+            GradientButton("حفظ التغييرات", onClick = { onSave(name, phone) })
         }
     }
 }
@@ -188,7 +188,7 @@ private fun SecurityTab(
             Spacer(Modifier.height(10.dp))
             AuthTextField(newPass, onNew, "كلمة السر الجديدة", Icons.Filled.Lock, isPassword = true)
             Spacer(Modifier.height(14.dp))
-            GradientButton(text = "تحديث كلمة السر", onClick = onChange)
+            GradientButton("تحديث كلمة السر", onChange)
         }
     }
 }

@@ -18,3 +18,4 @@ build/
 build/
 *.aab
 CM_KEYSTORE_BASE64.txt
+.gradle/

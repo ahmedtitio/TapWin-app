@@ -1,6 +1,7 @@
 package tap.win.app.util
 
 import android.app.Activity
+import android.content.Intent
 import androidx.activity.result.IntentSenderRequest
 import com.google.android.gms.auth.api.identity.BeginSignInRequest
 import com.google.android.gms.auth.api.identity.Identity
@@ -19,11 +20,11 @@ import kotlin.coroutines.resumeWithException
 /**
  * Firebase Google Sign-In helper.
  *
- * Flow: Credential Manager asks Google for an ID token (using the Web OAuth
- * client id from BuildConfig.GOOGLE_WEB_CLIENT_ID, which is injected by Codemagic
- * / gradle.properties), we exchange it with Firebase Auth, then send the
- * Firebase ID token to our backend (`POST api/auth/firebase`) which verifies
- * it and returns our own JWT session.
+ * Flow: Identity (Sign-In API) asks Google for an ID token (using the Web OAuth
+ * client id from BuildConfig.GOOGLE_WEB_CLIENT_ID, injected by Codemagic /
+ * gradle.properties), we exchange it with Firebase Auth, then send the Firebase
+ * ID token to our backend (`POST api/auth/firebase`) which verifies it and
+ * returns our own JWT session.
  */
 object GoogleSignInHelper {
 
@@ -31,13 +32,18 @@ object GoogleSignInHelper {
     val isEnabled: Boolean
         get() = BuildConfig.GOOGLE_WEB_CLIENT_ID.isNotBlank()
 
+    const val REQ_GOOGLE_SIGN_IN = 9001
+
     /**
      * Launches the Google account picker through the given Compose activity-result
      * launcher; [finishSignIn] is called by the launcher callback with the result.
      */
     suspend fun launchPicker(
         activity: Activity,
-        launcher: androidx.activity.compose.ManagedActivityResultLauncher<IntentSenderRequest, androidx.activity.result.IntentSenderRequest>,
+        launcher: androidx.activity.compose.ManagedActivityResultLauncher<
+            IntentSenderRequest,
+            androidx.activity.result.ActivityResult,
+        >,
     ): Boolean {
         if (!isEnabled) return false
         return try {
@@ -51,14 +57,13 @@ object GoogleSignInHelper {
                         .setFilterByAuthorizedAccounts(false)
                         .build(),
                 )
-                .setAutoCancelEnabled(true)
+                .setAutoSelectEnabled(true)
                 .build()
 
             val pendingResult = suspendCancellableCoroutine { cont ->
                 oneTapClient.beginSignIn(request)
                     .addOnSuccessListener { result -> cont.resume(result) }
                     .addOnFailureListener { e -> cont.resumeWithException(e) }
-                cont.invokeOnCancellation { oneTapClient.cancelSignIn() }
             }
             launcher.launch(
                 IntentSenderRequest.Builder(pendingResult.pendingIntent.intentSender).build(),
@@ -71,15 +76,15 @@ object GoogleSignInHelper {
 
     /**
      * Completes the sign-in after the Google picker returns.
-     * [data] is the IntentSender result Intent; it carries the Google ID token,
-     * which we exchange with Firebase Auth and then with our backend session.
+     * [data] is the result Intent; it carries the Google ID token, which we
+     * exchange with Firebase Auth and then with our backend session.
      */
-    suspend fun finishSignIn(activity: Activity, data: android.content.Intent?): Result<AuthResponse> {
+    suspend fun finishSignIn(activity: Activity, data: Intent?): Result<AuthResponse> {
         if (data == null) return Result.failure(Exception("لم يتم اختيار حساب Google"))
         return try {
-            val credential = Identity.getSignInClient(activity)
-                .getCredentialFromIntent(data)
-            val idToken = credential?.idToken
+            @Suppress("DEPRECATION")
+            val googleAccount = Identity.getSignInClient(activity).getSignInAccountFromIntent(data)
+            val idToken = googleAccount?.id
                 ?: return Result.failure(Exception("تعذّر الحصول على رمز Google"))
 
             // 1) Exchange the Google ID token for a Firebase user.
@@ -112,9 +117,5 @@ object GoogleSignInHelper {
         } catch (e: Exception) {
             Result.failure(e)
         }
-    }
-
-    companion object {
-        const val REQ_GOOGLE_SIGN_IN = 9001
     }
 }

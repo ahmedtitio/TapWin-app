@@ -30,9 +30,11 @@ import tap.win.app.api.LoginRequest
 import tap.win.app.api.RegisterRequest
 import tap.win.app.api.ResetRequest
 import tap.win.app.notifications.TapWinMessagingService
-import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
+import android.app.Activity
+import android.content.ContextWrapper
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import tap.win.app.util.Analytics
@@ -125,7 +127,7 @@ fun GradientButton(
         onClick = onClick,
         enabled = enabled && !loading,
         shape = RoundedCornerShape(14.dp),
-        contentPadding = Modifier.height(0.dp).let { PaddingValues(vertical = 14.dp) },
+        contentPadding = PaddingValues(vertical = 14.dp),
         colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
         modifier = Modifier
             .fillMaxWidth()
@@ -243,7 +245,7 @@ private fun LoginForm(onModeChange: (AuthMode) -> Unit, onAuthenticated: (AuthRe
             }
         }
         GoogleSignInButton(onAuthenticated = onAuthenticated, onError = { error = it })
-        Row(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
             Text("ليس لديك حساب؟ ", color = Color.White.copy(alpha = 0.6f))
             TextButton(onClick = { onModeChange(AuthMode.Register) }) {
                 Text("إنشاء حساب", color = Brand, fontWeight = FontWeight.Bold)
@@ -297,7 +299,7 @@ private fun RegisterForm(onModeChange: (AuthMode) -> Unit, onAuthenticated: (Aut
             }
         }
         GoogleSignInButton(onAuthenticated = onAuthenticated, onError = { error = it })
-        Row(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
             Text("لديك حساب بالفعل؟ ", color = Color.White.copy(alpha = 0.6f))
             TextButton(onClick = { onModeChange(AuthMode.Login) }) {
                 Text("تسجيل الدخول", color = Brand, fontWeight = FontWeight.Bold)
@@ -362,13 +364,22 @@ private fun ForgotForm(onModeChange: (AuthMode) -> Unit) {
 
 
 /** "Continue with Google" button backed by Firebase Auth + our backend exchange. */
+private fun android.content.Context.findActivity(): Activity? {
+    var ctx: android.content.Context = this
+    while (ctx is ContextWrapper) {
+        if (ctx is Activity) return ctx
+        ctx = ctx.baseContext
+    }
+    return null
+}
+
 @Composable
 fun GoogleSignInButton(
     onAuthenticated: (AuthResponse) -> Unit,
     onError: (String) -> Unit,
 ) {
     if (!GoogleSignInHelper.isEnabled) return // hidden until GOOGLE_WEB_CLIENT_ID is provided
-    val activity = LocalActivity.current ?: return
+    val activity = LocalContext.current.findActivity() ?: return
     var loading by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
