@@ -26,6 +26,12 @@ workflows:
         API_BASE_URL: "https://app-backend-api.tapwin.workers.dev"
         GA_MEASUREMENT_ID: "G-9HBP87R04M"
         GOOGLE_WEB_CLIENT_ID: "777921904281-9udm9ghsbn7r2f5dpu9h8a1sem2rq73u.apps.googleusercontent.com"
+        # Fallback keystore (base64) so build works even if no secrets are configured in UI.
+        # Preferred: define CM_KEYSTORE secret in Codemagic UI (it overrides this value).
+        CM_KEYSTORE_B64: "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"
+        CM_KEYSTORE_PASSWORD: "TapWin2026!Secure"
+        CM_KEY_ALIAS: "tapwin-key"
+        CM_KEY_PASSWORD: "TapWin2026!Secure"
     scripts:
       - name: Set up Android SDK
         script: |
@@ -33,10 +39,11 @@ workflows:
           echo "ANDROID_HOME=$CM_ANDROID_HOME" >> $CM_ENV
       - name: Decode release keystore
         script: |
-          if [ -z "$CM_KEYSTORE" ]; then
+          KS="${CM_KEYSTORE:-$CM_KEYSTORE_B64}"
+          if [ -z "$KS" ]; then
             echo "CM_KEYSTORE is not set – see comments at top of codemagic.yaml"; exit 1;
           fi
-          echo "$CM_KEYSTORE" | tr -d ' \n\r' | base64 --decode > $CM_BUILD_DIR/release.keystore
+          echo "$KS" | tr -d ' \n\r' | base64 --decode > $CM_BUILD_DIR/release.keystore
           if [ ! -s $CM_BUILD_DIR/release.keystore ]; then echo "ERROR: decoded keystore is empty"; exit 1; fi
           # sanity check: must be a valid JKS/PKCS12 keystore
           keytool -list -keystore $CM_BUILD_DIR/release.keystore -storepass "$CM_KEYSTORE_PASSWORD" >/dev/null 2>&1 \
