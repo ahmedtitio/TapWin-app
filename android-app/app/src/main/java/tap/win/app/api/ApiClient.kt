@@ -1,9 +1,9 @@
-package com.myapp.android.api
+package tap.win.app.api
 
 import android.content.Context
 import android.provider.Settings
-import com.myapp.android.BuildConfig
-import com.myapp.android.data.SessionStore
+import tap.win.app.BuildConfig
+import tap.win.app.data.SessionStore
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor

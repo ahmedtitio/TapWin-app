@@ -1,14 +1,16 @@
-package com.myapp.android
+package tap.win.app
 
 import android.app.Application
 import android.content.Intent
-import com.myapp.android.api.AppContextHolder
-import com.myapp.android.data.PresenceService
+import tap.win.app.api.AppContextHolder
+import tap.win.app.data.PresenceService
+import tap.win.app.util.Analytics
 
 class MyApp : Application() {
     override fun onCreate() {
         super.onCreate()
         AppContextHolder.context = applicationContext
+        Analytics.init(applicationContext)
     }
 
     companion object {

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "777921904281",
+    "project_id": "tapwin-app",
+    "storage_bucket": "tapwin-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:777921904281:android:0ee82531bdefccbd71c208",
+        "android_client_info": {
+          "package_name": "Tap.Win.App"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAiy4m9wlrMIPu8v2k8dfWaCdTXjziXLls"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

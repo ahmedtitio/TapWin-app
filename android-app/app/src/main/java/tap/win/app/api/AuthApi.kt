@@ -1,4 +1,4 @@
-package com.myapp.android.api
+package tap.win.app.api
 
 import com.google.gson.annotations.SerializedName
 import retrofit2.http.*
@@ -59,6 +59,18 @@ data class HeartbeatRequest(
     val platform: String = "android",
 )
 
+data class FirebaseLoginRequest(
+    @SerializedName("id_token") val idToken: String,
+    @SerializedName("device_id") val deviceId: String,
+    @SerializedName("device_name") val deviceName: String,
+    val platform: String = "android",
+)
+
+data class EventRequest(
+    val event: String,
+    val props: org.json.JSONObject? = null,
+)
+
 data class ApiError(
     val error: String?,
     val message: String?,
@@ -82,6 +94,9 @@ interface AuthApi {
 
     @POST("api/auth/logout")
     suspend fun logout(@Header("Authorization") auth: String): retrofit2.Response<Unit>
+
+    @POST("api/auth/firebase")
+    suspend fun firebaseLogin(@Body body: FirebaseLoginRequest): retrofit2.Response<AuthResponse>
 
     @POST("api/auth/heartbeat")
     suspend fun heartbeat(

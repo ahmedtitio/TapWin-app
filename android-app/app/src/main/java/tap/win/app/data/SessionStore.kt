@@ -1,4 +1,4 @@
-package com.myapp.android.data
+package tap.win.app.data
 
 import android.content.Context
 import androidx.security.crypto.EncryptedSharedPreferences

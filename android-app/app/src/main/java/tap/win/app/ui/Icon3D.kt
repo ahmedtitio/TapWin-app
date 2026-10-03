@@ -1,4 +1,4 @@
-package com.myapp.android.ui
+package tap.win.app.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*

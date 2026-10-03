@@ -1,9 +1,9 @@
-package com.myapp.android.data
+package tap.win.app.data
 
 import android.app.Service
 import android.content.Intent
 import android.os.IBinder
-import com.myapp.android.api.ApiClient
+import tap.win.app.api.ApiClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -31,7 +31,7 @@ class PresenceService : Service() {
                     runCatching {
                         ApiClient.authApi.heartbeat(
                             auth = "Bearer $token",
-                            body = com.myapp.android.api.HeartbeatRequest(
+                            body = tap.win.app.api.HeartbeatRequest(
                                 deviceId = ApiClient.deviceId,
                                 deviceName = ApiClient.deviceName,
                             ),

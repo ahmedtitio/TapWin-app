@@ -1,11 +1,11 @@
 # Dependencies
 node_modules/
 
-# Build Artifacts
+# Build artifacts
 dist/
-build/
 
-# Environment
-.env
-.env.local
-*.env.*
+# Android specific
+.gradle/
+build/
+*.apk
+*.aab

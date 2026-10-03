@@ -1,4 +1,4 @@
-package com.myapp.android
+package tap.win.app
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -8,12 +8,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.ui.graphics.Color
-import com.myapp.android.api.ApiClient
-import com.myapp.android.api.AuthResponse
-import com.myapp.android.data.SessionStore
-import com.myapp.android.ui.AuthMode
-import com.myapp.android.ui.AuthScreen
-import com.myapp.android.ui.HomeScreen
+import tap.win.app.api.ApiClient
+import tap.win.app.api.AuthResponse
+import tap.win.app.data.SessionStore
+import tap.win.app.ui.AuthMode
+import tap.win.app.ui.AuthScreen
+import tap.win.app.ui.HomeScreen
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 
@@ -63,7 +63,7 @@ private fun AppNav(session: SessionStore, activity: ComponentActivity) {
             scope.launch {
                 val res = runCatching {
                     ApiClient.authApi.refresh(
-                        com.myapp.android.api.RefreshRequest(session.refreshToken!!),
+                        tap.win.app.api.RefreshRequest(session.refreshToken!!),
                     )
                 }.getOrNull()
                 if (res?.isSuccessful == true && res.body() != null) {

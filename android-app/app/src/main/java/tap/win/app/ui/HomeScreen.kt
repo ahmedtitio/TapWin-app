@@ -1,4 +1,4 @@
-package com.myapp.android.ui
+package tap.win.app.ui
 
 import android.content.Intent
 import androidx.compose.foundation.background
@@ -15,17 +15,19 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.myapp.android.api.ApiClient
-import com.myapp.android.api.AuthResponse
-import com.myapp.android.api.User
-import com.myapp.android.data.SessionStore
+import tap.win.app.api.ApiClient
+import tap.win.app.api.AuthResponse
+import tap.win.app.api.User
+import tap.win.app.data.SessionStore
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
+import tap.win.app.util.Analytics
 
 @Composable
 fun HomeScreen(session: SessionStore, user: User, onLogout: () -> Unit) {
     GradientBackground {
         val scope = remember { MainScope() }
+        androidx.compose.runtime.LaunchedEffect(Unit) { Analytics.screenView("home") }
         var name by remember { mutableStateOf(user.fullName) }
         var phone by remember { mutableStateOf(user.phone ?: "") }
         var tab by remember { mutableStateOf(0) }

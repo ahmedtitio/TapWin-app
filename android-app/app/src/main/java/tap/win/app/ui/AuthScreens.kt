@@ -1,4 +1,4 @@
-package com.myapp.android.ui
+package tap.win.app.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -21,13 +21,20 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
-import com.myapp.android.api.ApiError
-import com.myapp.android.api.ApiClient
-import com.myapp.android.api.AuthResponse
-import com.myapp.android.api.ForgotRequest
-import com.myapp.android.api.LoginRequest
-import com.myapp.android.api.RegisterRequest
-import com.myapp.android.api.ResetRequest
+import tap.win.app.api.ApiError
+import tap.win.app.api.ApiClient
+import tap.win.app.api.AuthResponse
+import tap.win.app.api.ForgotRequest
+import tap.win.app.api.LoginRequest
+import tap.win.app.api.RegisterRequest
+import tap.win.app.api.ResetRequest
+import androidx.activity.compose.LocalActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import tap.win.app.util.Analytics
+import tap.win.app.util.GoogleSignInHelper
 import retrofit2.Response
 
 val Brand = Color(0xFF6C4DF6)
@@ -173,7 +180,7 @@ fun AuthScreen(
             )
             Spacer(Modifier.height(16.dp))
             Text(
-                "تطبيقي",
+                "Tap Win",
                 style = MaterialTheme.typography.headlineMedium,
                 color = Color.White,
                 fontWeight = FontWeight.ExtraBold,
@@ -196,8 +203,6 @@ fun AuthScreen(
         }
     }
 }
-
-private fun android.content.Context? /* not used */ placeholder() {}
 
 @Composable
 private fun LoginForm(onModeChange: (AuthMode) -> Unit, onAuthenticated: (AuthResponse) -> Unit) {
@@ -223,10 +228,13 @@ private fun LoginForm(onModeChange: (AuthMode) -> Unit, onAuthenticated: (AuthRe
                     LoginRequest(email.trim(), password, deviceId = ApiClient.deviceId, deviceName = ApiClient.deviceName),
                 )
                 loading = false
-                if (res.isSuccessful && res.body() != null) onAuthenticated(res.body()!!)
-                else error = errorMessage(res)
+                if (res.isSuccessful && res.body() != null) {
+                    Analytics.login("password")
+                    onAuthenticated(res.body()!!)
+                } else error = errorMessage(res)
             }
         }
+        GoogleSignInButton(onAuthenticated = onAuthenticated, onError = { error = it })
         Row(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
             Text("ليس لديك حساب؟ ", color = Color.White.copy(alpha = 0.6f))
             TextButton(onClick = { onModeChange(AuthMode.Register) }) {
@@ -274,10 +282,13 @@ private fun RegisterForm(onModeChange: (AuthMode) -> Unit, onAuthenticated: (Aut
                     ),
                 )
                 loading = false
-                if (res.isSuccessful && res.body() != null) onAuthenticated(res.body()!!)
-                else error = errorMessage(res)
+                if (res.isSuccessful && res.body() != null) {
+                    Analytics.register()
+                    onAuthenticated(res.body()!!)
+                } else error = errorMessage(res)
             }
         }
+        GoogleSignInButton(onAuthenticated = onAuthenticated, onError = { error = it })
         Row(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
             Text("لديك حساب بالفعل؟ ", color = Color.White.copy(alpha = 0.6f))
             TextButton(onClick = { onModeChange(AuthMode.Login) }) {
@@ -314,17 +325,9 @@ private fun ForgotForm(onModeChange: (AuthMode) -> Unit) {
                     val res = ApiClient.authApi.forgotPassword(ForgotRequest(email.trim()))
                     loading = false
                     if (res.isSuccessful) {
-                        val body = runCatching {
-                            com.google.gson.Gson().fromJson(
-                                res.errorBody()?.charStream(),
-                                Map::class.java,
-                            )
-                        }.getOrNull()
-                        // On success the backend returns 200 with optional dev reset token
+                        Analytics.passwordResetRequested()
                         step = 1
-                        info = "تم إنشاء رمز استعادة. إن كان الخادم في وضع التطوير سيظهر الرمز هنا."
-                        @Suppress("UNCHECKED_CAST")
-                        val token = (res as? Response<AuthResponse>)?.body()?.tokens?.accessToken
+                        info = "إذا كان البريد مسجلاً لدينا فستصلك رسالة تحتوي رمز الاستعادة."
                     } else error = errorMessage(res)
                 }
             }
@@ -345,6 +348,56 @@ private fun ForgotForm(onModeChange: (AuthMode) -> Unit) {
         }
         TextButton(onClick = { onModeChange(AuthMode.Login) }) {
             Text("العودة لتسجيل الدخول", color = Accent)
+        }
+    }
+}
+
+
+/** "Continue with Google" button backed by Firebase Auth + our backend exchange. */
+@Composable
+fun GoogleSignInButton(
+    onAuthenticated: (AuthResponse) -> Unit,
+    onError: (String) -> Unit,
+) {
+    if (!GoogleSignInHelper.isEnabled) return // hidden until GOOGLE_WEB_CLIENT_ID is provided
+    val activity = LocalActivity.current ?: return
+    var loading by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    // Registry launcher: receives the Google picker result and finishes sign-in.
+    val launcher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult(),
+    ) { result ->
+        scope.launch {
+            loading = false
+            GoogleSignInHelper.finishSignIn(activity, result.data).fold(
+                onSuccess = { onAuthenticated(it) },
+                onFailure = { onError(it.message ?: "فشل تسجيل الدخول بحساب Google") },
+            )
+        }
+    }
+
+    OutlinedButton(
+        onClick = {
+            loading = true
+            scope.launch {
+                val launched = GoogleSignInHelper.launchPicker(activity, launcher)
+                if (!launched) loading = false
+            }
+        },
+        shape = RoundedCornerShape(14.dp),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(52.dp),
+    ) {
+        if (loading) {
+            CircularProgressIndicator(color = Brand, modifier = Modifier.size(20.dp))
+        } else {
+            Icon(Icons.Filled.MailOutline, contentDescription = null, tint = Color(0xFFEA4335))
+            Spacer(Modifier.width(10.dp))
+            Text("المتابعة باستخدام حساب Google", fontWeight = FontWeight.SemiBold)
         }
     }
 }
