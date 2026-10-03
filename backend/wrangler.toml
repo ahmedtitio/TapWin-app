@@ -1,0 +1,16 @@
+# ============================================================
+# Cloudflare Workers configuration for the API backend
+# Deploy:   npx wrangler deploy        (after `npx wrangler login`)
+# Set vars: npx wrangler secret put DATABASE_URL
+#           npx wrangler secret put JWT_SECRET
+#           npx wrangler secret put ADMIN_EMAIL
+#           npx wrangler secret put ADMIN_PASSWORD
+#           npx wrangler secret put APP_URL
+# ============================================================
+name = "app-backend-api"
+main = "src/worker.js"
+compatibility_date = "2025-06-01"
+compatibility_flags = ["nodejs_compat"]
+
+[observability]
+enabled = true
