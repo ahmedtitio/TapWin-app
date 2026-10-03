@@ -2,7 +2,7 @@
 import { Router } from './mini-router.js';
 import { guardChain } from './mini-router.js';
 import { randomBytesHex } from './webcrypto-lite.js';
-import { query } from './db.js';
+import { query, newId } from './db.js';
 import {
   hashPassword, verifyPassword, signAccessToken, signRefreshToken,
   authRequired, sha256, clientIp,
@@ -51,9 +51,9 @@ router.post('/register', async (req, res) => {
 
     const hash = await hashPassword(password);
     const { rows } = await query(
-      `INSERT INTO users (full_name, username, email, phone, password_hash)
-       VALUES ($1,$2,$3,$4,$5) RETURNING id, full_name, username, email, role, created_at`,
-      [full_name.trim(), username.toLowerCase(), email.toLowerCase(), phone || null, hash],
+      `INSERT INTO users (id, full_name, username, email, phone, password_hash)
+       VALUES ($6,$1,$2,$3,$4,$5) RETURNING id, full_name, username, email, role, created_at`,
+      [full_name.trim(), username.toLowerCase(), email.toLowerCase(), phone || null, hash, newId()],
     );
     const user = rows[0];
 
@@ -302,10 +302,10 @@ router.post('/firebase', async (req, res) => {
       }
       const randomHash = await hashPassword(randomBytesHex(24));
       ({ rows } = await query(
-        `INSERT INTO users (full_name, username, email, phone, password_hash, avatar_url, firebase_uid)
-         VALUES ($1,$2,$3,NULL,$5,$6,$7)
+        `INSERT INTO users (id, full_name, username, email, phone, password_hash, avatar_url, firebase_uid)
+         VALUES ($8,$1,$2,$3,NULL,$5,$6,$7)
          RETURNING id, full_name, username, email, phone, role, avatar_url, last_login_at`,
-        [name, username, email, null, randomHash, fp.picture || null, fp.user_id],
+        [name, username, email, null, randomHash, fp.picture || null, fp.user_id, newId()],
       ));
       user = rows[0];
       await query(

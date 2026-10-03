@@ -10,6 +10,17 @@ export const query = (text, params) => {
   return _query(text, params);
 };
 
+/** App-side UUID v4 (works in Workers via crypto.randomUUID; fallback included). */
+export function newId() {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  const b = new Uint8Array(16);
+  globalThis.crypto.getRandomValues(b);
+  b[6] = (b[6] & 0x0f) | 0x40;
+  b[8] = (b[8] & 0x3f) | 0x80;
+  const h = [...b].map((x) => x.toString(16).padStart(2, '0')).join('');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+
 /** Node-only: create a real pg pool and register it as the query function. */
 export function initNodePool(connectionString) {
   // lazy import so bundlers targeting Workers never pull in the TCP driver
@@ -24,14 +35,32 @@ export function initNodePool(connectionString) {
  * Database schema for the whole platform (users + admin dashboard).
  * Idempotent: safe to run on every boot. Works with any executor that has
  * .query(text, params) — a pg Pool or the Neon serverless function.
+ *
+ * NOTE: we deliberately avoid the `pgcrypto` extension (CREATE EXTENSION can
+ * fail on some Neon roles/regions and broke boot with DB_NOT_READY). UUIDs use
+ * uuid_generate_v4() from the built-in `uuid-ossp` extension when available,
+ * otherwise the app generates ids client-side (see newId()).
  */
 export async function migrateWithSql(executor, bcryptLib, env = process.env) {
   const pool = executor;
-  await pool.query('CREATE EXTENSION IF NOT EXISTS pgcrypto');
+
+  // Try optional extensions but never let them abort the migration.
+  let uuidDefault = 'gen_random_uuid()'; // PG13+ built-in, no extension needed
+  try { await pool.query('CREATE EXTENSION IF NOT EXISTS pgcrypto'); }
+  catch (e) { console.warn('[db] pgcrypto unavailable:', e?.message || e); }
+  try { await pool.query('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"'); }
+  catch (e) { console.warn('[db] uuid-ossp unavailable:', e?.message || e); }
+  // Verify which uuid generator actually works in this database:
+  try {
+    await pool.query('SELECT gen_random_uuid()');
+  } catch {
+    try { await pool.query('SELECT uuid_generate_v4()'); uuidDefault = 'uuid_generate_v4()'; }
+    catch { uuidDefault = 'NULL'; console.warn('[db] no server-side uuid generator; ids will be app-generated'); }
+  }
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
-      id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      id                uuid PRIMARY KEY DEFAULT ${uuidDefault === 'NULL' ? '' : uuidDefault},
       full_name         text NOT NULL,
       username          text UNIQUE NOT NULL,
       email             text UNIQUE NOT NULL,
@@ -50,7 +79,7 @@ export async function migrateWithSql(executor, bcryptLib, env = process.env) {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS devices (
-      id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      id            uuid PRIMARY KEY DEFAULT ${uuidDefault === "NULL" ? "" : uuidDefault},
       user_id       uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       device_id     text UNIQUE NOT NULL,          -- stable per-install id from the app
       device_name   text,
@@ -93,7 +122,7 @@ export async function migrateWithSql(executor, bcryptLib, env = process.env) {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS sessions (
-      id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      id           uuid PRIMARY KEY DEFAULT ${uuidDefault === "NULL" ? "" : uuidDefault},
       user_id      uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       device_id    text,
       token_hash   text NOT NULL,
@@ -106,7 +135,7 @@ export async function migrateWithSql(executor, bcryptLib, env = process.env) {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS password_resets (
-      id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      id          uuid PRIMARY KEY DEFAULT ${uuidDefault === "NULL" ? "" : uuidDefault},
       user_id     uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       token_hash  text NOT NULL,
       expires_at  timestamptz NOT NULL,
@@ -117,7 +146,7 @@ export async function migrateWithSql(executor, bcryptLib, env = process.env) {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS refresh_tokens (
-      id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      id           uuid PRIMARY KEY DEFAULT ${uuidDefault === "NULL" ? "" : uuidDefault},
       user_id      uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       token_hash   text NOT NULL UNIQUE,
       device_id    text,
@@ -146,12 +175,14 @@ export async function migrateWithSql(executor, bcryptLib, env = process.env) {
     const password = env.ADMIN_PASSWORD || 'ChangeMe123!';
     const hash = await bcryptLib.hash(password, 12);
     await pool.query(
-      `INSERT INTO users (full_name, username, email, password_hash, role)
-       VALUES ($1,$2,$3,$4,'admin') ON CONFLICT (email) DO NOTHING`,
-      ['Administrator', 'admin', email, hash],
+      `INSERT INTO users (id, full_name, username, email, password_hash, role)
+       VALUES ($5,$1,$2,$3,$4,'admin') ON CONFLICT (email) DO NOTHING`,
+      ['Administrator', 'admin', email, hash, newId()],
     );
     console.log(`[db] seeded admin user: ${email}`);
   }
+
+  return { ok: true, uuidDefault };
 }
 
 /** Node convenience wrapper: migrate using the registered pg pool. */

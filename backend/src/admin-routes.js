@@ -1,6 +1,6 @@
 // Admin-only routes used by the Cloudflare web dashboard.
 import { Router } from './mini-router.js';
-import { query } from './db.js';
+import { query, newId } from './db.js';
 import { authRequired, adminOnly, hashPassword } from './auth.js';
 import { guardChain } from './mini-router.js';
 
@@ -104,10 +104,10 @@ router.post('/users', async (req, res) => {
 
     const hash = await hashPassword(password);
     const { rows } = await query(
-      `INSERT INTO users (full_name, username, email, phone, password_hash, role)
-       VALUES ($1,$2,$3,$4,$5,$6)
+      `INSERT INTO users (id, full_name, username, email, phone, password_hash, role)
+       VALUES ($7,$1,$2,$3,$4,$5,$6)
        RETURNING id, full_name, username, email, phone, role, is_active, created_at`,
-      [full_name, username.toLowerCase(), email.toLowerCase(), phone || null, hash, role === 'admin' ? 'admin' : 'user'],
+      [full_name, username.toLowerCase(), email.toLowerCase(), phone || null, hash, role === 'admin' ? 'admin' : 'user', newId()],
     );
     res.status(201).json({ user: rows[0] });
   } catch (e) {

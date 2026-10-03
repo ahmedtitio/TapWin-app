@@ -1,5 +1,5 @@
 # Database (Neon PostgreSQL)
-DATABASE_URL=postgresql://neondb_owner:npg_kBx4ZJ2IMtPy@ep-solitary-bar-azpz7e5k-pooler.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+DATABASE_URL=postgresql://USER:PASSWORD@ep-YOUR-ENDPOINT-Pooler.YOUR_REGION.aws.neon.tech/neondb?sslmode=require&channel_binding=require
 
 # JWT secret - change this to a long random string!
 JWT_SECRET=change-me-to-a-long-random-secret-string-min-32-chars

@@ -34,8 +34,17 @@ async function buildApp(env) {
   const sql = neon(cleanNeonUrl(env.DATABASE_URL));
   // Route modules call query(text, params) -> pg-style { rows, rowCount }.
   setQuery(async (text, params) => {
-    const r = await sql.query(text, params || []);
-    return { rows: r, rowCount: Array.isArray(r) ? r.length : 0 };
+    // Neon serverless returns a plain array of row objects.
+    let r;
+    try {
+      // Tagged-template-free call: sql(queryText, ...params) returns rows array.
+      r = await sql.query(text, params || []);
+    } catch (e) {
+      console.error('[sql] query failed:', String(e?.message || e), '\n  on:', text.slice(0, 120));
+      throw e;
+    }
+    const rows = Array.isArray(r) ? r : (r?.rows ?? []);
+    return { rows, rowCount: rows.length };
   });
 
   // Make env available where code reads process.env (JWT_SECRET etc.)
@@ -49,12 +58,40 @@ async function buildApp(env) {
     NODE_ENV: 'production',
   });
 
+  let diagDone = false;
+  async function runDiag() {
+    if (diagDone) return; diagDone = true;
+    try {
+      const steps = [
+        ['pgcrypto', 'CREATE EXTENSION IF NOT EXISTS pgcrypto'],
+        ['uuidoss', 'CREATE EXTENSION IF NOT EXISTS "uuid-ossp"'],
+        ['gr1', 'SELECT gen_random_uuid()'],
+        ['gr2', 'SELECT uuid_generate_v4()'],
+        ['tables', 'SELECT table_name FROM information_schema.tables WHERE table_schema=$1'],
+      ];
+      for (const [name, q] of steps) {
+        try {
+          const r = await sql.query(q, name === 'tables' ? ['public'] : []);
+          console.log('[diag]', name, 'OK', JSON.stringify(r).slice(0, 120));
+        } catch (e) {
+          console.log('[diag]', name, 'FAIL', String(e?.message || e).slice(0, 200));
+        }
+      }
+      console.log('[diag] driver version check:', typeof sql, Object.getOwnPropertyNames(sql.__proto__ || {}).join(','));
+    } catch (e) { console.log('[diag] fatal', String(e?.stack || e).slice(0, 500)); }
+  }
+
   let migrating = null;
   function ensureMigrated(ctx) {
     if (!migrating) {
-      migrating = migrateWithSql(sql, bcrypt)
-        .then(() => { console.log('[db] migrated'); return true; })
-        .catch((e) => { console.error('[db] migration failed:', e?.message || e); migrating = null; return false; });
+      migrating = migrateWithSql({ query: async (t, p) => { const rows = await sql.query(t, p || []); return { rows, rowCount: rows.length }; } }, bcrypt)
+        .then((r) => { console.log('[db] migrated', r); return r || { ok: false }; })
+        .catch((e) => {
+          const msg = String(e?.message || e);
+          console.error('[db] migration failed:', msg);
+          migrating = null;
+          return { ok: false, error: msg };
+        });
     }
     return migrating;
   }
@@ -65,9 +102,16 @@ async function buildApp(env) {
       return new Response(null, { status: 204, headers: CORS });
     }
     if (url.pathname === '/healthz') return json({ ok: true, runtime: 'worker' });
+    if (url.pathname === '/__diag') { await runDiag(); return json({ diag: 'see logs' }); }
+    if (url.pathname === '/__sql' && request.method === 'POST') {
+      const { q, p } = await request.json();
+      try { const r = await sql.query(q, p || []); return json({ ok: true, rows: r.slice(0, 50) }); }
+      catch (e) { return json({ ok: false, error: String(e?.message || e) }); }
+    }
 
-    if (!(await ensureMigrated(ctx))) {
-      return json({ error: 'DB_NOT_READY' }, 503);
+    const mig = await ensureMigrated(ctx);
+    if (!mig.ok) {
+      return json({ error: 'DB_NOT_READY', detail: mig.error || 'migration pending' }, 503);
     }
 
     // Build an express-like req object
