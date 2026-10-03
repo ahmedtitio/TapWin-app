@@ -55,7 +55,7 @@ workflows:
           for v in API_BASE_URL GA_MEASUREMENT_ID GOOGLE_WEB_CLIENT_ID CM_KEYSTORE_PASSWORD CM_KEY_ALIAS CM_KEY_PASSWORD; do
             eval "echo \"$v=${!v}\"" >> $CM_ENV
           done
-          cd $CM_CLONE_DIR/android-app
+          cd "$CM_BUILD_DIR/../clone/android-app"
           chmod +x gradlew
           ./gradlew assembleRelease bundleRelease \
             -PAPI_BASE_URL="$API_BASE_URL" \
