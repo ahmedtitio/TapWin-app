@@ -157,6 +157,10 @@ router.post('/forgot-password', async (req, res) => {
     console.log(`[auth] password reset link for ${email}: ${link}`);
     // TODO production: send this link through Cloudflare Email Sending / Resend / SendGrid.
 
+    // In development (no SMTP configured) return the raw link so clients can use it directly.
+    if (!process.env.SMTP_READY && process.env.NODE_ENV !== 'production') {
+      return res.json({ ...generic, reset_url: link });
+    }
     res.json(generic);
   } catch (e) {
     console.error(e);

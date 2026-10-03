@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Stylised "M" monogram with layered gradient strokes for a 3D feel -->
+    <path
+        android:pathData="M34,74 L34,40 L54,60 L74,40 L74,74"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="9"
+        android:color="#FFFFFF" />
+    <path
+        android:pathData="M34,70 L34,36 L54,56 L74,36 L74,70"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="9"
+        android:strokeAlpha="0.25"
+        android:color="#00D4AA" />
+</vector>
