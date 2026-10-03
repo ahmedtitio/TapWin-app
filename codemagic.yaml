@@ -36,9 +36,18 @@ workflows:
           if [ -z "$CM_KEYSTORE" ]; then
             echo "CM_KEYSTORE is not set – see comments at top of codemagic.yaml"; exit 1;
           fi
-          echo "$CM_KEYSTORE" | base64 --decode > $CM_BUILD_DIR/release.keystore
+          echo "$CM_KEYSTORE" | tr -d ' \n\r' | base64 --decode > $CM_BUILD_DIR/release.keystore
+          if [ ! -s $CM_BUILD_DIR/release.keystore ]; then echo "ERROR: decoded keystore is empty"; exit 1; fi
+          # sanity check: must be a valid JKS/PKCS12 keystore
+          keytool -list -keystore $CM_BUILD_DIR/release.keystore -storepass "$CM_KEYSTORE_PASSWORD" >/dev/null 2>&1 \
+            || { echo "ERROR: invalid keystore or wrong CM_KEYSTORE_PASSWORD"; exit 1; }
+          echo "Keystore OK"
       - name: Build Release APK + AAB
         script: |
+          # make vars available & visible to all following steps
+          for v in API_BASE_URL GA_MEASUREMENT_ID GOOGLE_WEB_CLIENT_ID CM_KEYSTORE_PASSWORD CM_KEY_ALIAS CM_KEY_PASSWORD; do
+            eval "echo \"$v=${!v}\"" >> $CM_ENV
+          done
           cd $CM_CLONE_DIR/android-app
           chmod +x gradlew
           ./gradlew assembleRelease bundleRelease \
