@@ -14,3 +14,6 @@ build/
 
 # OS files
 .DS_Store
+# Codemagic build outputs
+build/
+*.aab
