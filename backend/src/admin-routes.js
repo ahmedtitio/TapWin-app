@@ -1,10 +1,10 @@
 // Admin-only routes used by the Cloudflare web dashboard.
-import { Router } from 'express';
+import { Router } from './mini-router.js';
 import { query } from './db.js';
 import { authRequired, adminOnly, hashPassword } from './auth.js';
+import { guardChain } from './mini-router.js';
 
 const router = Router();
-router.use(authRequired('admin'), adminOnly);
 
 const ONLINE_WINDOW_MIN = 5; // device considered online if heartbeat within N minutes
 
@@ -227,4 +227,5 @@ router.get('/activity', async (req, res) => {
   } catch (e) { console.error(e); res.status(500).json({ error: 'SERVER_ERROR' }); }
 });
 
+export const guards = guardChain(authRequired('admin'), adminOnly);
 export default router;

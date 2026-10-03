@@ -1,6 +1,7 @@
 // Authentication routes shared by the Flutter app and the web admin panel.
-import { Router } from 'express';
-import crypto from 'crypto';
+import { Router } from './mini-router.js';
+import { guardChain } from './mini-router.js';
+import { randomBytesHex } from './webcrypto-lite.js';
 import { query } from './db.js';
 import {
   hashPassword, verifyPassword, signAccessToken, signRefreshToken,
@@ -67,7 +68,7 @@ router.post('/register', async (req, res) => {
       );
     }
 
-    const accessToken = signAccessToken(user, 'app');
+    const accessToken = await signAccessToken(user, 'app');
     const refreshToken = signRefreshToken();
     await storeRefreshToken(user.id, refreshToken, device_id);
 
@@ -125,7 +126,7 @@ router.post('/login', async (req, res) => {
       id: user.id, full_name: user.full_name, username: user.username, email: user.email,
       phone: user.phone, role: user.role, avatar_url: user.avatar_url, last_login_at: user.last_login_at,
     };
-    const accessToken = signAccessToken(publicUser, aud);
+    const accessToken = await signAccessToken(publicUser, aud);
     const refreshToken = signRefreshToken();
     await storeRefreshToken(user.id, refreshToken, device_id);
     await logLogin(user.id, email, true, req);
@@ -140,12 +141,89 @@ router.post('/login', async (req, res) => {
 /* --------------------- FIREBASE GOOGLE SIGN-IN ------------------------- */
 // The Android app gets an ID token from Firebase Auth (Google provider) and
 // exchanges it here for our own JWT session. Requires FIREBASE_PROJECT_ID env.
+
+/* ---- PEM (x509) -> RSA JWK parts, pure JS, Workers-safe ---- */
+function b64FromPem(pem) {
+  return pem.replace(/-----[^-]+-----/g, '').replace(/\s+/g, '');
+}
+function bytesFromB64(b64) {
+  const bin = atob(b64);
+  const u = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+  return u;
+}
+// Minimal DER walker returning [tag, contentBytes] slices of an ASN.1 sequence.
+function derSeq(buf, offset) {
+  if (buf[offset] !== 0x30) throw new Error('DER: expected SEQUENCE');
+  let len = buf[offset + 1];
+  let hdr = 2;
+  if (len & 0x80) { const n = len & 0x7f; len = 0; for (let i = 0; i < n; i++) len = (len << 8) | buf[offset + 2 + i]; hdr = 2 + n; }
+  return { start: offset + hdr, end: offset + hdr + len };
+}
+function derIntBytes(buf, offset) {
+  if (buf[offset] !== 0x02) throw new Error('DER: expected INTEGER');
+  let len = buf[offset + 1];
+  let hdr = 2;
+  if (len & 0x80) { const n = len & 0x7f; len = 0; for (let i = 0; i < n; i++) len = (len << 8) | buf[offset + 2 + i]; hdr = 2 + n; }
+  let v = buf.slice(offset + hdr, offset + hdr + len);
+  while (v.length && v[0] === 0x00) v = v.slice(1); // strip leading zero
+  return v;
+}
+async function pemToModulusExponent(pem) {
+  // x509 cert: SEQUENCE { tbsCertificate { ... subjectPublicKeyInfo { alg, BIT STRING { RSAPublicKey } } } }
+  // Google serves keys as x509 PEM. Extract the SPKI via simple scan for the trailing RSA key.
+  const der = bytesFromB64(b64FromPem(pem));
+  const cert = derSeq(der, 0);            // outer SEQUENCE
+  const tbs = derSeq(der, cert.start);    // tbsCertificate SEQUENCE
+  // Walk tbs fields to find subjectPublicKeyInfo (SEQUENCE containing OID rsaEncryption + BIT STRING)
+  let o = tbs.start;
+  const end = tbs.end;
+  let spki = null;
+  while (o < end) {
+    if (der[o] === 0x30) {
+      const seq = derSeq(der, o);
+      if (der[seq.start] === 0x30 && der[seq.start + 1] !== undefined) {
+        const alg = derSeq(der, seq.start);
+        if (der[alg.end] === 0x03) { // AlgorithmIdentifier then BIT STRING
+          spki = seq; break;
+        }
+      }
+      const seq2 = derSeq(der, o);
+      o = seq2.end;
+    } else {
+      // skip non-SEQUENCE TLV
+      let len = der[o + 1]; let hdr = 2;
+      if (len & 0x80) { const n = len & 0x7f; len = 0; for (let i = 0; i < n; i++) len = (len << 8) | der[o + 2 + i]; hdr = 2 + n; }
+      o += hdr + len;
+    }
+  }
+  if (!spki) throw new Error('SPKI not found');
+  const bitStringOffset = (() => { let x = spki.start; const alg = derSeq(der, x); x = alg.end; return x; })();
+  if (der[bitStringOffset] !== 0x03) throw new Error('expected BIT STRING');
+  let blen = der[bitStringOffset + 1]; let bhdr = 2;
+  if (blen & 0x80) { const n = blen & 0x7f; blen = 0; for (let i = 0; i < n; i++) blen = (blen << 8) | der[bitStringOffset + 2 + i]; bhdr = 2 + n; }
+  const rsaStart = bitStringOffset + bhdr + 1; // skip unused-bits byte
+  const rsaSeq = derSeq(der, rsaStart);         // RSAPublicKey SEQUENCE
+  const modulus = derIntBytes(der, rsaSeq.start);
+  let afterMod = rsaSeq.start;
+  { const m = derIntBytes(der, afterMod); let l = der[afterMod + 1]; let h = 2; if (l & 0x80) { const n = l & 0x7f; l = 0; for (let i = 0; i < n; i++) l = (l << 8) | der[afterMod + 2 + i]; h = 2 + n; } afterMod += h + m.length; }
+  const exponent = derIntBytes(der, afterMod);
+  return [modulus, exponent];
+}
+
 async function verifyFirebaseIdToken(idToken) {
   const projectId = process.env.FIREBASE_PROJECT_ID;
   if (!projectId) throw new Error('FIREBASE_NOT_CONFIGURED');
 
   // Decode header/payload without verifying first to get kid/aud/exp.
-  const decode = (part) => JSON.parse(Buffer.from(part, 'base64url').toString('utf8'));
+  const decode = (part) => {
+    let b = part.replace(/-/g, '+').replace(/_/g, '/');
+    b += '='.repeat((4 - (b.length % 4)) % 4);
+    const bin = atob(b);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return JSON.parse(new TextDecoder().decode(bytes));
+  };
   const [header, payload] = idToken.split('.');
   const h = decode(header);
   const p = decode(payload);
@@ -166,9 +244,20 @@ async function verifyFirebaseIdToken(idToken) {
   const pem = verifyFirebaseIdToken._jwks[h.kid];
   if (!pem) throw new Error('UNKNOWN_KID');
 
-  const cryptoLib = await import('crypto');
-  const ok = cryptoLib.default.createVerify('RSA-SHA256')
-    .verify(pem, idToken.split('.').slice(0, 2).join('.'), 'base64url');
+  // Verify RS256 signature using Web Crypto (Workers-safe).
+  const [jwkModulus, jwkExponent] = await pemToModulusExponent(pem);
+  const key = await crypto.subtle.importKey(
+    'public',
+    { kty: 'RSA', n: jwkModulus, e: jwkExponent, alg: 'RS256', ext: true },
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+    false, ['verify'],
+  );
+  const signed = idToken.split('.').slice(0, 2).join('.');
+  const sigB64 = idToken.split('.')[2].replace(/-/g, '+').replace(/_/g, '/');
+  const sigBin = atob(sigB64 + '='.repeat((4 - (sigB64.length % 4)) % 4));
+  const sig = new Uint8Array(sigBin.length);
+  for (let i = 0; i < sigBin.length; i++) sig[i] = sigBin.charCodeAt(i);
+  const ok = await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, sig, new TextEncoder().encode(signed));
   if (!ok) throw new Error('BAD_SIGNATURE');
   return p;
 }
@@ -211,7 +300,7 @@ router.post('/firebase', async (req, res) => {
         if (!taken.rows.length) break;
         username = `${base}${++suffix}`;
       }
-      const randomHash = await hashPassword(crypto.randomBytes(24).toString('hex'));
+      const randomHash = await hashPassword(randomBytesHex(24));
       ({ rows } = await query(
         `INSERT INTO users (full_name, username, email, phone, password_hash, avatar_url, firebase_uid)
          VALUES ($1,$2,$3,NULL,$5,$6,$7)
@@ -242,7 +331,7 @@ router.post('/firebase', async (req, res) => {
       id: user.id, full_name: user.full_name, username: user.username, email: user.email,
       phone: user.phone, role: user.role, avatar_url: user.avatar_url, last_login_at: user.last_login_at,
     };
-    const accessToken = signAccessToken(publicUser, 'app');
+    const accessToken = await signAccessToken(publicUser, 'app');
     const refreshToken = signRefreshToken();
     await storeRefreshToken(user.id, refreshToken, device_id);
     await logLogin(user.id, email, true, req);
@@ -257,7 +346,7 @@ router.post('/firebase', async (req, res) => {
 /* ---------------------------- APP ANALYTICS ---------------------------- */
 // Lightweight event ingestion from the Android app (Google Analytics is also
 // wired on the client; this gives the admin dashboard first-party stats too).
-router.post('/event', authRequired('app'), async (req, res) => {
+router.post('/event', [authRequired('app')], async (req, res) => {
   try {
     const { event, device_id, platform, props } = req.body || {};
     if (!event || typeof event !== 'string' || event.length > 64)
@@ -286,7 +375,7 @@ router.post('/forgot-password', async (req, res) => {
     const { rows } = await query('SELECT id FROM users WHERE email=$1', [email.toLowerCase()]);
     if (!rows.length) return res.json(generic);
 
-    const token = crypto.randomBytes(32).toString('hex');
+    const token = randomBytesHex(32);
     await query(
       `INSERT INTO password_resets (user_id, token_hash, expires_at) VALUES ($1,$2, now() + interval '1 hour')`,
       [rows[0].id, sha256(token)],
@@ -351,7 +440,7 @@ router.post('/refresh', async (req, res) => {
 
     const { rows: urows } = await query('SELECT id, full_name, username, email, role, avatar_url FROM users WHERE id=$1', [row.user_id]);
     const user = urows[0];
-    const accessToken = signAccessToken(user, aud);
+    const accessToken = await signAccessToken(user, aud);
     res.json({ tokens: { accessToken, refreshToken: refresh_token }, user });
   } catch (e) {
     console.error(e);
@@ -378,7 +467,7 @@ router.post('/logout', async (req, res) => {
 
 /* ------------------------- HEARTBEAT (presence) ------------------------ */
 // Called periodically by the Flutter app so the admin panel can show online status.
-router.post('/heartbeat', authRequired('app'), async (req, res) => {
+router.post('/heartbeat', [authRequired('app')], async (req, res) => {
   try {
     const { device_id, device_name, platform, app_version } = req.body || {};
     if (!device_id) return res.status(400).json({ error: 'VALIDATION' });
@@ -397,14 +486,14 @@ router.post('/heartbeat', authRequired('app'), async (req, res) => {
 });
 
 /* ------------------------------- ME ------------------------------------ */
-router.get('/me', authRequired('app'), async (req, res) => {
+router.get('/me', [authRequired('app')], async (req, res) => {
   const { rows } = await query(
     `SELECT id, full_name, username, email, phone, role, avatar_url, is_active, last_login_at, created_at
      FROM users WHERE id=$1`, [req.user.id]);
   res.json({ user: rows[0] });
 });
 
-router.patch('/me', authRequired('app'), async (req, res) => {
+router.patch('/me', [authRequired('app')], async (req, res) => {
   try {
     const { full_name, phone, avatar_url } = req.body || {};
     const { rows } = await query(
@@ -420,7 +509,7 @@ router.patch('/me', authRequired('app'), async (req, res) => {
   }
 });
 
-router.post('/change-password', authRequired('app'), async (req, res) => {
+router.post('/change-password', [authRequired('app')], async (req, res) => {
   try {
     const { current_password, new_password } = req.body || {};
     const { rows } = await query('SELECT password_hash FROM users WHERE id=$1', [req.user.id]);

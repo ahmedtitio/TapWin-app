@@ -1,11 +1,14 @@
-# Dependencies
 node_modules/
-
-# Build artifacts
 dist/
-
-# Android specific
-.gradle/
+.wrangler/
+.env
+.env.local
+*.log
 build/
-*.apk
-*.aab
+.gradle/
+local.properties
+__pycache__/
+*.jks
+*.keystore
+backend/.dev.vars
+secrets/

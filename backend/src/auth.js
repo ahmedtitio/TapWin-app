@@ -1,16 +1,17 @@
 // Auth helpers: JWT, hashing, middleware.
-import jwt from 'jsonwebtoken';
+import * as jwt from './jwt-lite.js';
 import bcrypt from 'bcryptjs';
-import crypto from 'crypto';
+import { randomBytesHex, sha256Hex } from './webcrypto-lite.js';
 import { query } from './db.js';
 
 const SECRET = () => process.env.JWT_SECRET || 'dev-secret-change-me';
 
 export const hashPassword = (plain) => bcrypt.hash(plain, 12);
 export const verifyPassword = (plain, hash) => bcrypt.compare(plain, hash);
-export const sha256 = (s) => crypto.createHash('sha256').update(s).digest('hex');
+export const sha256 = (s) => sha256Hex(s);
+export const randomHex = (n) => randomBytesHex(n);
 
-export function signAccessToken(user, audience) {
+export async function signAccessToken(user, audience) {
   return jwt.sign(
     { sub: user.id, role: user.role, email: user.email, username: user.username },
     SECRET(),
@@ -19,7 +20,7 @@ export function signAccessToken(user, audience) {
 }
 
 export function signRefreshToken() {
-  return crypto.randomBytes(48).toString('hex');
+  return randomBytesHex(48);
 }
 
 /** Express middleware factory: require a valid JWT with the given audience. */
@@ -53,5 +54,5 @@ export function adminOnly(req, res, next) {
 }
 
 export const clientIp = (req) =>
-  (req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for'] || req.socket.remoteAddress || '')
+  ((req.headers && (req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for'])) || '')
     .toString().split(',')[0].trim();
