@@ -7,12 +7,17 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:777921904281:android:0ee82531bdefccbd71c208",
+        "mobilesdk_app_id": "1:777921904281:android:1e227e6a22aa570271c208",
         "android_client_info": {
           "package_name": "tap.win.app"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "777921904281-9udm9ghsbn7r2f5dpu9h8a1sem2rq73u.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyAiy4m9wlrMIPu8v2k8dfWaCdTXjziXLls"
@@ -20,7 +25,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "777921904281-9udm9ghsbn7r2f5dpu9h8a1sem2rq73u.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
