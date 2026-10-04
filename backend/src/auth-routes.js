@@ -117,8 +117,10 @@ async function consumeEmailCode(userId, purpose, code) {
 /* ------------------------------ REGISTER ------------------------------ */
 router.post('/register', async (req, res) => {
   try {
-    const { full_name, username, email, phone, password } = req.body || {};
-    if (!full_name || !username || !email || !password)
+    const { full_name, email, phone, password } = req.body || {};
+    // username is optional (web dashboard doesn't collect it) — derive from email local-part.
+    const username = (req.body?.username || '').trim() || String(email || '').split('@')[0].replace(/[^a-z0-9._-]/gi, '') || `user_${Date.now().toString(36)}`;
+    if (!full_name || !email || !password)
       return res.status(400).json({ error: 'VALIDATION', message: 'كل الحقول المطلوبة يجب تعبئتها' });
     if (!EMAIL_RE.test(email))
       return res.status(400).json({ error: 'VALIDATION', message: 'صيغة البريد الإلكتروني غير صحيحة' });
@@ -482,20 +484,21 @@ router.post('/forgot-password', async (req, res) => {
 /* ---------------------------- RESET PASSWORD --------------------------- */
 router.post('/reset-password', async (req, res) => {
   try {
-    const { token, password } = req.body || {};
-    if (!token || !password) return res.status(400).json({ error: 'VALIDATION', message: 'التوكن وكلمة السر مطلوبان' });
+    const { token, code, password } = req.body || {};
+    const resetToken = token || code; // web/app may send the OTP as `code`
+    if (!resetToken || !password) return res.status(400).json({ error: 'VALIDATION', message: 'التوكن وكلمة السر مطلوبان' });
     const bad = pwIssue(password);
     if (bad) return res.status(400).json({ error: 'VALIDATION', message: bad });
 
     let userId = null;
-    const isSixDigit = /^\d{6}$/.test(String(token).trim());
+    const isSixDigit = /^\d{6}$/.test(String(resetToken).trim());
     if (isSixDigit) {
       // Find the user that owns this active reset code.
       const { rows } = await query(
         `SELECT ec.user_id FROM email_codes ec
          WHERE ec.purpose='reset_password' AND ec.code_hash=$1 AND ec.used_at IS NULL AND ec.expires_at > now()
          ORDER BY ec.id DESC LIMIT 1`,
-        [sha256(String(token).trim())],
+        [sha256(String(resetToken).trim())],
       );
       if (!rows.length) return res.status(400).json({ error: 'INVALID_CODE', message: 'رمز التحقق غير صالح أو منتهي الصلاحية' });
       userId = rows[0].user_id;
@@ -504,11 +507,11 @@ router.post('/reset-password', async (req, res) => {
       const { rows } = await query(
         `SELECT pr.user_id FROM password_resets pr
          WHERE pr.token_hash=$1 AND pr.expires_at > now() AND pr.used_at IS NULL`,
-        [sha256(token)],
+        [sha256(resetToken)],
       );
       if (!rows.length) return res.status(400).json({ error: 'INVALID_TOKEN', message: 'الرابط غير صالح أو منتهي الصلاحية' });
       userId = rows[0].user_id;
-      await query('UPDATE password_resets SET used_at=now() WHERE token_hash=$1', [sha256(token)]);
+      await query('UPDATE password_resets SET used_at=now() WHERE token_hash=$1', [sha256(resetToken)]);
     }
 
     const hash = await hashPassword(password);
@@ -648,9 +651,25 @@ router.post('/fcm-token', [authRequired('app')], async (req, res) => {
 /* ------------------------------- ME ------------------------------------ */
 router.get('/me', [authRequired('app')], async (req, res) => {
   const { rows } = await query(
-    `SELECT id, full_name, username, email, phone, role, avatar_url, is_active, last_login_at, created_at
+    `SELECT id, full_name, username, email, phone, role, avatar_url, is_active,
+            email_verified, last_login_at, created_at
      FROM users WHERE id=$1`, [req.user.id]);
-  res.json({ user: rows[0] });
+  // Enrich with the user's own devices + recent activity for the web dashboard.
+  let devices = [], activity = [];
+  try {
+    const d = await query(
+      `SELECT device_id, device_name, platform, app_version, is_active, push_token IS NOT NULL AS has_push,
+              last_seen_at
+       FROM devices WHERE user_id=$1 ORDER BY last_seen_at DESC NULLS LAST LIMIT 20`, [req.user.id]);
+    devices = d.rows;
+  } catch (e) { console.error('me/devices', e); }
+  try {
+    const a = await query(
+      `SELECT action, platform, ip, created_at FROM login_logs WHERE user_id=$1
+       ORDER BY created_at DESC LIMIT 15`, [req.user.id]);
+    activity = a.rows;
+  } catch (e) { console.error('me/activity', e); }
+  res.json({ user: rows[0], devices, activity });
 });
 
 router.patch('/me', [authRequired('app')], async (req, res) => {
