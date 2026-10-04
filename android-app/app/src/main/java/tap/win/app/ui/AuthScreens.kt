@@ -181,7 +181,7 @@ fun GradientButton(
                         text,
                         fontWeight = FontWeight.ExtraBold,
                         color = Color.White,
-                        letterSpacing = 0.5.dp,
+                        letterSpacing = 0.5.sp,
                     )
                 }
             }
@@ -241,8 +241,8 @@ fun GoogleGLogo(size: androidx.compose.ui.unit.Dp = 24.dp) {
         val s = this.size.minDimension / scaleBase
         fun seg(d: String, color: Color) {
             val p = androidx.compose.ui.graphics.Path()
-            androidx.compose.ui.graphics.vector.PathParser(d).toPath(p)
-            p.transform(android.graphics.Matrix().apply { preScale(s, s) })
+            androidx.compose.ui.graphics.vector.PathParser().setFullPath(d).toPath(p)
+            p.transform(androidx.compose.ui.graphics.Matrix().apply { scale(s, s) })
             drawPath(p, color)
         }
         seg(
