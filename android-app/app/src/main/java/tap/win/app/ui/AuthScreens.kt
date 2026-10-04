@@ -222,7 +222,11 @@ fun GoogleGradientButton(
             if (loading) {
                 CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = Brand)
             } else {
-                GoogleGLogo(size = 22.dp)
+                Image(
+                    painter = painterResource(id = R.drawable.ic_google_logo),
+                    contentDescription = "Google",
+                    modifier = Modifier.size(22.dp),
+                )
             }
             Spacer(Modifier.width(12.dp))
             Text(
@@ -250,7 +254,6 @@ fun GoogleGLogo(size: androidx.compose.ui.unit.Dp = 24.dp) {
         painter = painterResource(id = R.drawable.ic_google_logo),
         contentDescription = "Google",
         modifier = Modifier.size(size),
-        tint = Color.Unspecified,
     )
 }
 
