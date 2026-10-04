@@ -4,6 +4,9 @@ dist/
 *.log
 .env
 .env.*
-CM_KEYSTORE_BASE64.txt
+CM_KEYSTORE_BASE64.md
 android-app/tapwin-release.jks
 secrets/
+build/
+.gradle/
+local.properties
