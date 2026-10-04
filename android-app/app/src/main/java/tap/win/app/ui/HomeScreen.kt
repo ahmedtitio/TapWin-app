@@ -19,14 +19,14 @@ import tap.win.app.api.ApiClient
 import tap.win.app.api.AuthResponse
 import tap.win.app.api.User
 import tap.win.app.data.SessionStore
-import kotlinx.coroutines.MainScope
+import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import tap.win.app.util.Analytics
 
 @Composable
 fun HomeScreen(session: SessionStore, user: User, onLogout: () -> Unit) {
     GradientBackground {
-        val scope = remember { MainScope() }
+        val scope = rememberCoroutineScope()
         androidx.compose.runtime.LaunchedEffect(Unit) { Analytics.screenView("home") }
         var name by remember { mutableStateOf(user.fullName) }
         var phone by remember { mutableStateOf(user.phone ?: "") }

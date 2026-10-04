@@ -232,7 +232,7 @@ private fun LoginForm(onModeChange: (AuthMode) -> Unit, onAuthenticated: (AuthRe
             Text("نسيت كلمة السر؟", color = Accent)
         }
 
-        GradientButton(text = "تسجيل الدخول", loading = loading) {
+        GradientButton(text = "تسجيل الدخول", loading = loading, onClick = {
             loading = true; error = null
             kotlinx.coroutines.MainScope().launch {
                 val res = ApiClient.authApi.login(
@@ -244,7 +244,7 @@ private fun LoginForm(onModeChange: (AuthMode) -> Unit, onAuthenticated: (AuthRe
                     onAuthenticated(res.body()!!)
                 } else error = errorMessage(res)
             }
-        }
+        })
         GoogleSignInButton(onAuthenticated = onAuthenticated, onError = { error = it })
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
             Text("ليس لديك حساب؟ ", color = Color.White.copy(alpha = 0.6f))
@@ -277,8 +277,8 @@ private fun RegisterForm(onModeChange: (AuthMode) -> Unit, onAuthenticated: (Aut
         AuthTextField(password, { password = it }, "كلمة السر", Icons.Filled.Lock, isPassword = true)
         AuthTextField(confirm, { confirm = it }, "تأكيد كلمة السر", Icons.Filled.Lock, isPassword = true)
 
-        GradientButton(text = "إنشاء الحساب", loading = loading) {
-            if (password != confirm) { error = "كلمتا السر غير متطابقتين"; return@GradientButton }
+        GradientButton(text = "إنشاء الحساب", loading = loading, onClick = {
+            if (password == confirm) {
             loading = true; error = null
             kotlinx.coroutines.MainScope().launch {
                 val res = ApiClient.authApi.register(
@@ -298,7 +298,8 @@ private fun RegisterForm(onModeChange: (AuthMode) -> Unit, onAuthenticated: (Aut
                     onAuthenticated(res.body()!!)
                 } else error = errorMessage(res)
             }
-        }
+            } else error = "كلمتا السر غير متطابقتين"
+        })
         GoogleSignInButton(onAuthenticated = onAuthenticated, onError = { error = it })
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
             Text("لديك حساب بالفعل؟ ", color = Color.White.copy(alpha = 0.6f))
@@ -330,7 +331,7 @@ private fun ForgotForm(onModeChange: (AuthMode) -> Unit) {
         if (step == 0) {
             AuthTextField(email, { email = it }, "البريد الإلكتروني", Icons.Filled.MailOutline,
                 keyboardType = androidx.compose.ui.text.input.KeyboardType.Email)
-            GradientButton(text = "إرسال رمز الاستعادة", loading = loading) {
+            GradientButton(text = "إرسال رمز الاستعادة", loading = loading, onClick = {
                 loading = true; error = null; info = null
                 kotlinx.coroutines.MainScope().launch {
                     val res = ApiClient.authApi.forgotPassword(ForgotRequest(email.trim()))
@@ -341,11 +342,11 @@ private fun ForgotForm(onModeChange: (AuthMode) -> Unit) {
                         info = "إذا كان البريد مسجلاً لدينا فستصلك رسالة تحتوي رمز الاستعادة."
                     } else error = errorMessage(res)
                 }
-            }
+            })
         } else {
             AuthTextField(code, { code = it }, "رمز الاستعادة", Icons.Filled.Lock)
             AuthTextField(newPass, { newPass = it }, "كلمة السر الجديدة", Icons.Filled.Lock, isPassword = true)
-            GradientButton(text = "تعيين كلمة السر", loading = loading) {
+            GradientButton(text = "تعيين كلمة السر", loading = loading, onClick = {
                 loading = true; error = null
                 kotlinx.coroutines.MainScope().launch {
                     val res = ApiClient.authApi.resetPassword(ResetRequest(code.trim(), newPass))
@@ -355,7 +356,7 @@ private fun ForgotForm(onModeChange: (AuthMode) -> Unit) {
                         step = 0
                     } else error = errorMessage(res)
                 }
-            }
+            })
         }
         TextButton(onClick = { onModeChange(AuthMode.Login) }) {
             Text("العودة لتسجيل الدخول", color = Accent)

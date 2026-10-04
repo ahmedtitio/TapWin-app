@@ -53,7 +53,17 @@ workflows:
           echo "Keystore OK ($(wc -c < $CM_BUILD_DIR/release.keystore) bytes)"
       - name: Build Release APK + AAB
         script: |
-          cd "$CM_BUILD_DIR/../clone/android-app"
+          # Resolve android-app robustly (CM_BUILD_DIR may be a temp dir, not inside clone)
+          if [ -d "$CM_CLONE_DIR/android-app" ]; then
+            APP_DIR="$CM_CLONE_DIR/android-app"
+          elif [ -d "$CM_BUILD_DIR/../clone/android-app" ]; then
+            APP_DIR="$CM_BUILD_DIR/../clone/android-app"
+          else
+            APP_DIR="$(find "$HOME" /Users/builder -maxdepth 3 -type d -name android-app 2>/dev/null | head -1)"
+          fi
+          echo "APP_DIR=$APP_DIR"
+          [ -d "$APP_DIR" ] || { echo "ERROR: android-app directory not found"; exit 1; }
+          cd "$APP_DIR"
           chmod +x gradlew
           ./gradlew assembleRelease bundleRelease \
             "-PAPI_BASE_URL=$API_BASE_URL" \
@@ -66,12 +76,11 @@ workflows:
             --no-daemon --stacktrace
       - name: Stage artifacts
         script: |
-          mkdir -p $CM_BUILD_DIR/output
-          cp android-app/app/build/outputs/apk/release/app-release.apk \
-             $CM_BUILD_DIR/output/TapWin-latest.apk
-          cp android-app/app/build/outputs/bundle/release/app-release.aab \
-             $CM_BUILD_DIR/output/TapWin-latest.aab
-          ls -la $CM_BUILD_DIR/output
+          SRC="${APP_DIR:-$CM_CLONE_DIR/android-app}/app/build/outputs"
+          mkdir -p "$CM_BUILD_DIR/output"
+          find "$SRC" -name "*.apk" -exec cp {} "$CM_BUILD_DIR/output/TapWin-latest.apk" \;
+          find "$SRC" -name "*.aab" -exec cp {} "$CM_BUILD_DIR/output/TapWin-latest.aab" \;
+          ls -la "$CM_BUILD_DIR/output"
     artifacts:
       - output/*.apk
       - output/*.aab

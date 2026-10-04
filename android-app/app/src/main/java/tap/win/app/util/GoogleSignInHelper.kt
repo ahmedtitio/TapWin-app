@@ -6,7 +6,6 @@ import androidx.activity.result.IntentSenderRequest
 import com.google.android.gms.auth.api.identity.BeginSignInRequest
 import com.google.android.gms.auth.api.identity.Identity
 import com.google.android.gms.auth.api.identity.SignInClient
-import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -83,22 +82,11 @@ object GoogleSignInHelper {
     suspend fun finishSignIn(activity: Activity, data: Intent?): Result<AuthResponse> {
         if (data == null) return Result.failure(Exception("لم يتم اختيار حساب Google"))
         return try {
-            @Suppress("DEPRECATION")
-            val googleAccount = try {
-                // Static factory method resolved reflectively for cross-version safety.
-                val m = GoogleSignInAccount::class.java.getDeclaredMethod(
-                    "getFromIntent", Intent::class.java, Class.forName(
-                        "com.google.android.gms.common.api.Status"
-                    )
-                )
-                m.invoke(null, data, null) as? GoogleSignInAccount
-            } catch (e: NoSuchMethodException) {
-                val m = GoogleSignInAccount::class.java.getDeclaredMethod(
-                    "getFromIntent", Intent::class.java
-                )
-                m.invoke(null, data) as? GoogleSignInAccount
-            }
-            val idToken = googleAccount?.id
+            // The Identity (Sign-In) API returns a Credential whose token field is
+            // the Google ID token when BeginSignInRequest used GoogleIdTokenRequestOptions.
+            val credential = Identity.getCredentialClient(activity)
+                .getCredentialFromIntent(data)
+            val idToken = credential?.token
                 ?: return Result.failure(Exception("تعذّر الحصول على رمز Google"))
 
             // 1) Exchange the Google ID token for a Firebase user.

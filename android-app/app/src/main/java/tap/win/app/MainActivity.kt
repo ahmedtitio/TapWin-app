@@ -12,14 +12,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
-import kotlinx.coroutines.launch
 import tap.win.app.api.ApiClient
 import tap.win.app.api.AuthResponse
 import tap.win.app.data.SessionStore
 import tap.win.app.ui.AuthMode
 import tap.win.app.ui.AuthScreen
 import tap.win.app.ui.HomeScreen
-import kotlinx.coroutines.MainScope
+import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -53,7 +52,7 @@ private fun AppNav(session: SessionStore, activity: ComponentActivity) {
     var auth by remember { mutableStateOf<AuthResponse?>(null) }
     var checked by remember { mutableStateOf(false) }
     var mode by remember { mutableStateOf<AuthMode>(AuthMode.Login) }
-    val scope = remember { MainScope() }
+    val scope = rememberCoroutineScope()
 
     // Restore session on cold start via refresh token
     if (!checked) {
