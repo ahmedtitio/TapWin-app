@@ -10,7 +10,7 @@
 |---|---|---|---|
 | الباك-إند API | Cloudflare Workers + Neon PostgreSQL | `https://app-backend-api.tapwin.workers.dev` | ✅ منشور ويعمل |
 | لوحة تحكم الأدمن | React + Vite + Cloudflare Pages | `https://admin-dashboard-6yx.pages.dev` | ✅ منشورة وتعمل |
-| واجهة المستخدم الويب | React + Vite (user-dashboard/) | لم تُنشر بعد على Pages | ⏳ جاهزة محلياً — بانتظار النشر |
+| واجهة المستخدم الويب | React + Vite + Cloudflare Pages | `https://user-dashboard-enw.pages.dev` | ✅ منشورة وتعمل (HTTP 200) |
 | تطبيق أندرويد | Kotlin + Jetpack Compose (حزمة `tap.win.app`) | يُبنى عبر Codemagic | ⚠️ آخر بناء فشل — راجع قسم المشاكل |
 | المستودع | GitHub | `github.com/ahmedtitio/TapWin-app` (فرع main) | ✅ مربوط ويُدفع عليه |
 | Firebase | مشروع `tapwin-app` | Google Sign-In + FCM + GA4 | ✅ البيانات مضبوطة |
@@ -122,11 +122,12 @@ npx wrangler pages deploy dist --project-name user-dashboard
 
 ## 8. المهام القادمة (To-Do)
 
-- [ ] عمل commit & push للتعديلات الجارية (قسم 2) والتحقق من HEAD عبر GitHub API.
-- [ ] إعادة نشر الـ Worker: `cd backend && npx wrangler deploy` (لتفعيل email_codes + إصلاح name alias).
-- [ ] بدء بناء Codemagic جديد والتأكد من نجاح assembleRelease وظهور APK/AAB.
-- [ ] اختبار حي: register → وصول رمز → verify → دخول اللوحة / login عادي / Google sign-in.
-- [ ] نشر user-dashboard على Cloudflare Pages.
+- [x] عمل commit & push للتعديلات الجارية والتحقق من HEAD عبر GitHub API (`e0f29ac`).
+- [x] إعادة نشر الـ Worker (Version ID `9254bf29`) — تم اختبار register→verify→login بنجاح على الإنتاج.
+- [ ] بدء بناء Codemagic جديد **من أحدث كوميت** والتأكد من نجاح assembleRelease وظهور APK/AAB.
+- [x] اختبار حي على الإنتاج: register → dev_code → verify-email → login (email_verified=true).
+- [ ] اختبار Google sign-in على جهاز فعلي بعد البناء الجديد.
+- [x] نشر user-dashboard على Cloudflare Pages → https://user-dashboard-enw.pages.dev
 - [ ] ربط Resend API لإرسال بريد فعلي.
 - [ ] إضافة بصمتي SHA1/SHA256 في Firebase Console لتطبيق `tap.win.app` (إذا لم تُضف بعد).
 
