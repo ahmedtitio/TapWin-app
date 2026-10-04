@@ -21,15 +21,8 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.foundation.Image
-import androidx.compose.ui.graphics.PathFillType
-import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.foundation.Canvas
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.graphics.vector.group
-import androidx.compose.ui.graphics.vector.addPath
-import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -244,60 +237,75 @@ fun GoogleGradientButton(
 /**
  * Real vector Google "G" logo (official brand paths) — not an emoji.
  *
- * Implemented with ImageVector + Group/Path (androidx.compose.ui.graphics.vector)
- * which works with every Compose version — no PathParser(String)/Path.copy()
- * APIs that are unavailable on the project's compose-compiler (1.5.14).
+ * Drawn with Canvas + androidx.compose.ui.graphics.Path using ONLY stable APIs
+ * (moveTo/lineTo/cubicTo/close). This avoids every API that is unavailable or
+ * changed on the project's compose-compiler 1.5.14 / Compose UI 1.7.x:
+ * no vector.addPath, no PathParser().nodes (private), no Path.copy().
+ * Coordinates are pre-computed absolute values from the official SVG path data
+ * (viewBox 0..52 x 0..52).
  */
-private val GoogleGVector: ImageVector by lazy {
-    // The brand path set is authored on a ~52x52 viewport.
-    val w = 52f
-    val h = 52f
-    ImageVector.Builder(
-        name = "GoogleG",
-        defaultWidth = 24.dp,
-        defaultHeight = 24.dp,
-        viewportWidth = w,
-        viewportHeight = h,
-    ).group(
-        name = "google-g",
-        rotate = 0f,
-        scaleX = 1f,
-        scaleY = 1f,
-        translationX = 0f,
-        translationY = 0f,
-        pivotX = w / 2f,
-        pivotY = h / 2f,
-        clipPathData = emptyList(),
-    ) {
-        fun gseg(d: String, color: Color, nm: String) {
-            addPath(
-                pathData = PathParser().parsePathString(d).nodes,
-                name = nm,
-                fill = SolidColor(color),
-                fillAlpha = 1f,
-                stroke = null,
-                strokeAlpha = 1f,
-                strokeLineWidth = 0f,
-                strokeLineCap = StrokeCap.Butt,
-                strokeLineJoin = StrokeJoin.Miter,
-                strokeLineMiter = 1f,
-                pathFillType = PathFillType.NonZero,
-            )
-        }
-        gseg("M25.99 9.46c3.42 0 6.5 1.18 8.92 3.49l6.64-6.64C37.95 2.72 32.34 0 25.99 0 15.99 0 7.29 6.32 3.79 15.36l7.74 6c2.18-6.52 8.41-11.9 14.46-11.9z", Color(0xFFEA4335), "arc-red")
-        gseg("M50.01 25.5c0-1.72-.15-3.38-.43-4.98H25.99v9.44h13.51c-.59 3.13-2.36 5.78-5.03 7.56l7.73 6c4.52-4.18 7.81-10.36 7.81-18.02z", Color(0xFF4285F4), "arc-blue")
-        gseg("M11.53 28.64a15.3 15.3 0 0 1-.82-4.64c0-1.61.29-3.18.81-4.66l-7.73-6C2.35 17.52 1.5 21.34 1.5 25.31s.85 7.79 2.29 11.29l7.74-6.02z", Color(0xFFFBBB04), "arc-yellow")
-        gseg("M25.99 50.62c6.35 0 11.7-2.09 15.61-5.68l-7.73-6c-2.1 1.41-4.89 2.25-7.88 2.25-6.05 0-11.27-3.86-13.13-9.25l-7.74 6c3.49 9.04 12.19 12.68 20.87 12.68z", Color(0xFF34A853), "arc-green")
-    }.build()
-}
-
 @Composable
 fun GoogleGLogo(size: androidx.compose.ui.unit.Dp = 24.dp) {
-    Image(
-        imageVector = GoogleGVector,
-        contentDescription = "Google",
-        modifier = Modifier.size(size),
-    )
+    val colorRed = Color(0xFFEA4335)
+    val colorBlue = Color(0xFF4285F4)
+    val colorYellow = Color(0xFFFBBB04)
+    val colorGreen = Color(0xFF34A853)
+
+    Canvas(modifier = Modifier.size(size)) {
+        val sx = size.width / 52f
+        val sy = size.height / 52f
+
+        fun seg(color: Color, block: androidx.compose.ui.graphics.Path.() -> Unit) {
+            val p = androidx.compose.ui.graphics.Path().apply(block)
+            drawPath(p, color)
+        }
+
+        // Red arc (top)
+        seg(colorRed) {
+            moveTo(25.99f * sx, 9.46f * sy)
+            cubicTo(29.41f * sx, 9.46f * sy, 32.49f * sx, 10.64f * sy, 34.91f * sx, 12.95f * sy)
+            lineTo(41.55f * sx, 6.31f * sy)
+            cubicTo(37.95f * sx, 2.72f * sy, 32.34f * sx, 0f * sy, 25.99f * sx, 0f * sy)
+            cubicTo(15.99f * sx, 0f * sy, 7.29f * sx, 6.32f * sy, 3.79f * sx, 15.36f * sy)
+            lineTo(11.53f * sx, 21.36f * sy)
+            cubicTo(13.71f * sx, 14.84f * sy, 19.94f * sx, 9.46f * sy, 25.99f * sx, 9.46f * sy)
+            close()
+        }
+        // Blue arc (right bar + crossbar)
+        seg(colorBlue) {
+            moveTo(50.01f * sx, 25.5f * sy)
+            cubicTo(50.01f * sx, 23.78f * sy, 49.86f * sx, 22.12f * sy, 49.58f * sx, 20.52f * sy)
+            lineTo(25.99f * sx, 20.52f * sy)
+            lineTo(25.99f * sx, 29.96f * sy)
+            lineTo(39.5f * sx, 29.96f * sy)
+            cubicTo(38.91f * sx, 33.09f * sy, 37.14f * sx, 35.74f * sy, 34.47f * sx, 37.52f * sy)
+            lineTo(42.2f * sx, 43.52f * sy)
+            cubicTo(46.72f * sx, 39.34f * sy, 50.01f * sx, 33.16f * sy, 50.01f * sx, 25.5f * sy)
+            close()
+        }
+        // Yellow arc (left)
+        seg(colorYellow) {
+            moveTo(11.53f * sx, 28.64f * sy)
+            cubicTo(11.03f * sx, 27.24f * sy, 10.71f * sx, 25.68f * sy, 10.71f * sx, 24.04f * sy)
+            cubicTo(10.71f * sx, 22.39f * sy, 11.0f * sx, 20.82f * sy, 11.52f * sx, 19.34f * sy)
+            lineTo(3.79f * sx, 13.34f * sy)
+            cubicTo(2.35f * sx, 16.52f * sy, 1.5f * sx, 20.34f * sy, 1.5f * sx, 24.31f * sy)
+            cubicTo(1.5f * sx, 28.28f * sy, 2.35f * sx, 32.1f * sy, 3.79f * sx, 35.28f * sy)
+            lineTo(11.53f * sx, 28.64f * sy)
+            close()
+        }
+        // Green arc (bottom)
+        seg(colorGreen) {
+            moveTo(25.99f * sx, 47.62f * sy)
+            cubicTo(32.34f * sx, 47.62f * sy, 37.69f * sx, 45.53f * sy, 41.6f * sx, 41.94f * sy)
+            lineTo(33.87f * sx, 35.94f * sy)
+            cubicTo(31.77f * sx, 37.35f * sy, 28.98f * sx, 38.19f * sy, 25.99f * sx, 38.19f * sy)
+            cubicTo(19.94f * sx, 38.19f * sy, 14.72f * sx, 34.33f * sy, 12.86f * sx, 28.94f * sy)
+            lineTo(5.12f * sx, 34.94f * sy)
+            cubicTo(8.61f * sx, 43.98f * sy, 17.31f * sx, 47.62f * sy, 25.99f * sx, 47.62f * sy)
+            close()
+        }
+    }
 }
 
 /** Extracts the Arabic error message from an API error response. */
