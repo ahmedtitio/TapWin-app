@@ -54,3 +54,4 @@ object Analytics {
     fun logout() = logEvent("logout")
     fun profileUpdated() = logEvent("profile_updated")
     fun passwordResetRequested() = logEvent("forgot_password")
+}

@@ -31,6 +31,7 @@ import tap.win.app.api.ForgotRequest
 import tap.win.app.api.LoginRequest
 import tap.win.app.api.RegisterRequest
 import tap.win.app.api.ResetRequest
+import tap.win.app.api.VerifyEmailRequest
 import tap.win.app.notifications.TapWinMessagingService
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
