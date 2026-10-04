@@ -86,18 +86,20 @@ object GoogleSignInHelper {
             IntentSenderRequest,
             androidx.activity.result.ActivityResult,
         >,
-    ): Boolean = try {
-        val pending = Identity.getSignInClient(activity)
-            .getSignInIntent(
-                GetSignInIntentRequest.builder()
-                    .setServerClientId(BuildConfig.GOOGLE_WEB_CLIENT_ID)
-                    .build(),
-            ).await()
-        val sender = extractIntentSender(pending) ?: return false
-        launcher.launch(IntentSenderRequest.Builder(sender).build())
-        true
-    } catch (e2: Exception) {
-        false
+    ): Boolean {
+        return try {
+            val pending = Identity.getSignInClient(activity)
+                .getSignInIntent(
+                    GetSignInIntentRequest.builder()
+                        .setServerClientId(BuildConfig.GOOGLE_WEB_CLIENT_ID)
+                        .build(),
+                ).await()
+            val sender = extractIntentSender(pending) ?: return false
+            launcher.launch(IntentSenderRequest.Builder(sender).build())
+            true
+        } catch (e2: Exception) {
+            false
+        }
     }
 
     /** Reads the IntentSender out of a PendingIntent reflectively (compile-safe on all 21.x). */
