@@ -19,7 +19,7 @@ const pwIssue = (p) => {
 };
 
 async function storeRefreshToken(userId, token, deviceId) {
-  const hash = sha256(token);
+  const hash = await sha256(token);
   // Upsert: if the same token is stored twice (e.g. retried request), update instead of failing on UNIQUE.
   await query(
     `INSERT INTO refresh_tokens (user_id, token_hash, device_id, expires_at)
@@ -82,7 +82,7 @@ async function issueEmailCode(userId, purpose, email, name, kind) {
   await query(
     `INSERT INTO email_codes (user_id, purpose, code_hash, expires_at)
      VALUES ($1,$2,$3, now() + interval '${kind === 'reset' ? '15 minutes' : '24 hours'}')`,
-    [userId, purpose, sha256(code)],
+    [userId, purpose, await sha256(code)],
   );
   const title = kind === 'reset' ? 'رمز استعادة كلمة السر' : 'رمز التحقق من البريد الإلكتروني';
   const intro = kind === 'reset'
@@ -107,7 +107,7 @@ async function consumeEmailCode(userId, purpose, code) {
     `SELECT id FROM email_codes
      WHERE user_id=$1 AND purpose=$2 AND code_hash=$3 AND used_at IS NULL AND expires_at > now()
      ORDER BY id DESC LIMIT 1`,
-    [userId, purpose, sha256(String(code || '').trim())],
+    [userId, purpose, await sha256(String(code || '').trim())],
   );
   if (!rows.length) return false;
   await query('UPDATE email_codes SET used_at=now() WHERE id=$1', [rows[0].id]);
@@ -510,7 +510,7 @@ router.post('/reset-password', async (req, res) => {
         `SELECT ec.user_id FROM email_codes ec
          WHERE ec.purpose='reset_password' AND ec.code_hash=$1 AND ec.used_at IS NULL AND ec.expires_at > now()
          ORDER BY ec.id DESC LIMIT 1`,
-        [sha256(String(resetToken).trim())],
+        [await sha256(String(resetToken).trim())],
       );
       if (!rows.length) return res.status(400).json({ error: 'INVALID_CODE', message: 'رمز التحقق غير صالح أو منتهي الصلاحية' });
       userId = rows[0].user_id;
@@ -519,11 +519,11 @@ router.post('/reset-password', async (req, res) => {
       const { rows } = await query(
         `SELECT pr.user_id FROM password_resets pr
          WHERE pr.token_hash=$1 AND pr.expires_at > now() AND pr.used_at IS NULL`,
-        [sha256(resetToken)],
+        [await sha256(resetToken)],
       );
       if (!rows.length) return res.status(400).json({ error: 'INVALID_TOKEN', message: 'الرابط غير صالح أو منتهي الصلاحية' });
       userId = rows[0].user_id;
-      await query('UPDATE password_resets SET used_at=now() WHERE token_hash=$1', [sha256(resetToken)]);
+      await query('UPDATE password_resets SET used_at=now() WHERE token_hash=$1', [await sha256(resetToken)]);
     }
 
     const hash = await hashPassword(password);
@@ -587,7 +587,7 @@ router.post('/refresh', async (req, res) => {
     const { rows } = await query(
       `SELECT rt.*, u.is_active, u.role FROM refresh_tokens rt JOIN users u ON u.id=rt.user_id
        WHERE rt.token_hash=$1 AND rt.revoked_at IS NULL AND rt.expires_at > now()`,
-      [sha256(refresh_token)],
+      [await sha256(refresh_token)],
     );
     const row = rows[0];
     if (!row || !row.is_active) return res.status(401).json({ error: 'INVALID_REFRESH' });
@@ -608,7 +608,7 @@ router.post('/logout', async (req, res) => {
   try {
     const { refresh_token, device_id } = req.body || {};
     if (refresh_token) {
-      await query('UPDATE refresh_tokens SET revoked_at=now() WHERE token_hash=$1', [sha256(refresh_token)]);
+      await query('UPDATE refresh_tokens SET revoked_at=now() WHERE token_hash=$1', [await sha256(refresh_token)]);
     }
     if (device_id) {
       await query('UPDATE devices SET is_active=false WHERE device_id=$1', [device_id]);
