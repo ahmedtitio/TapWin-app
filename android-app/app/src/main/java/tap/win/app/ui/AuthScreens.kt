@@ -19,19 +19,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.shadow
+import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.PathFillType
-import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.window.Dialog
+import tap.win.app.R
 import tap.win.app.api.ApiError
 import tap.win.app.api.ApiClient
 import tap.win.app.api.AuthResponse
@@ -238,112 +236,18 @@ fun GoogleGradientButton(
 }
 
 /**
- * Real vector Google "G" logo (official brand paths) — not an emoji.
+ * Real multi-color Google "G" logo — NOT an emoji.
  *
- * STABLE IMPLEMENTATION: uses the exact same public API as every generated
- * material-icons source file: ImageVector.Builder(...){ addPath(...) { ... } }
- * with only absolute moveTo/lineTo/cubicTo calls inside PathBuilder.
- * No PathParser internals, no Canvas math, no local helper functions.
+ * FINAL STABLE IMPLEMENTATION: a genuine Android VectorDrawable XML resource
+ * (res/drawable/ic_google_logo.xml, official brand path data) rendered via
+ * painterResource(). This avoids ALL Compose vector DSL APIs entirely
+ * (ImageVector.Builder / PathParser / Canvas math), which have proven
+ * version-fragile in this project's build pipeline.
  */
-private val GoogleGIcon: ImageVector by lazy {
-    ImageVector.Builder(
-        name = "GoogleG",
-        defaultWidth = 24.dp,
-        defaultHeight = 24.dp,
-        viewportWidth = 52f,
-        viewportHeight = 52f,
-    ) {
-        addPath(
-            fill = SolidColor(Color(0xFFEA4335)),
-            fillAlpha = 1f,
-            stroke = null,
-            strokeAlpha = 1f,
-            strokeLineWidth = 1f,
-            strokeLineCap = StrokeCap.Butt,
-            strokeLineJoin = StrokeJoin.Miter,
-            strokeLineMiter = 1f,
-            pathFillType = PathFillType.NonZero,
-        ) {
-            // Red (top)
-            moveTo(26f, 9.5f)
-            cubicTo(29.4f, 9.5f, 32.5f, 10.6f, 34.9f, 13f)
-            lineTo(41.6f, 6.3f)
-            cubicTo(37.9f, 2.7f, 32.3f, 0f, 26f, 0f)
-            cubicTo(16f, 0f, 7.3f, 6.3f, 3.8f, 15.4f)
-            lineTo(11.5f, 21.4f)
-            cubicTo(13.7f, 14.8f, 19.9f, 9.5f, 26f, 9.5f)
-            close()
-        }
-        addPath(
-            fill = SolidColor(Color(0xFFFBBB04)),
-            fillAlpha = 1f,
-            stroke = null,
-            strokeAlpha = 1f,
-            strokeLineWidth = 1f,
-            strokeLineCap = StrokeCap.Butt,
-            strokeLineJoin = StrokeJoin.Miter,
-            strokeLineMiter = 1f,
-            pathFillType = PathFillType.NonZero,
-        ) {
-            // Yellow (left)
-            moveTo(11.5f, 28.6f)
-            cubicTo(11f, 27.2f, 10.7f, 25.7f, 10.7f, 24f)
-            cubicTo(10.7f, 22.4f, 11f, 20.8f, 11.5f, 19.3f)
-            lineTo(3.8f, 13.3f)
-            cubicTo(2.4f, 16.5f, 1.5f, 20.3f, 1.5f, 24f)
-            cubicTo(1.5f, 27.7f, 2.4f, 31.5f, 3.8f, 34.7f)
-            close()
-        }
-        addPath(
-            fill = SolidColor(Color(0xFF4285F4)),
-            fillAlpha = 1f,
-            stroke = null,
-            strokeAlpha = 1f,
-            strokeLineWidth = 1f,
-            strokeLineCap = StrokeCap.Butt,
-            strokeLineJoin = StrokeJoin.Miter,
-            strokeLineMiter = 1f,
-            pathFillType = PathFillType.NonZero,
-        ) {
-            // Blue (right + crossbar)
-            moveTo(50f, 25.5f)
-            cubicTo(50f, 23.8f, 49.9f, 22.1f, 49.6f, 20.5f)
-            lineTo(26f, 20.5f)
-            lineTo(26f, 29.9f)
-            lineTo(39.5f, 29.9f)
-            cubicTo(38.9f, 33.1f, 37.1f, 35.7f, 34.5f, 37.5f)
-            lineTo(42.2f, 43.5f)
-            cubicTo(46.7f, 39.3f, 50f, 33.2f, 50f, 25.5f)
-            close()
-        }
-        addPath(
-            fill = SolidColor(Color(0xFF34A853)),
-            fillAlpha = 1f,
-            stroke = null,
-            strokeAlpha = 1f,
-            strokeLineWidth = 1f,
-            strokeLineCap = StrokeCap.Butt,
-            strokeLineJoin = StrokeJoin.Miter,
-            strokeLineMiter = 1f,
-            pathFillType = PathFillType.NonZero,
-        ) {
-            // Green (bottom)
-            moveTo(26f, 47.6f)
-            cubicTo(32.3f, 47.6f, 37.7f, 45.5f, 41.6f, 41.9f)
-            lineTo(33.9f, 35.9f)
-            cubicTo(31.8f, 37.4f, 29f, 38.2f, 26f, 38.2f)
-            cubicTo(20f, 38.2f, 14.7f, 34.3f, 12.9f, 28.9f)
-            lineTo(5.1f, 34.9f)
-            cubicTo(8.6f, 44f, 17.3f, 47.6f, 26f, 47.6f)
-            close()
-        }
-    }.build()
-}
-
 @Composable
 fun GoogleGLogo(size: androidx.compose.ui.unit.Dp = 24.dp) {
-    Icon(
-        imageVector = GoogleGIcon,
+    Image(
+        painter = painterResource(id = R.drawable.ic_google_logo),
         contentDescription = "Google",
         modifier = Modifier.size(size),
         tint = Color.Unspecified,
