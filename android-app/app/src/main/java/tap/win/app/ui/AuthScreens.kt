@@ -1,7 +1,19 @@
 package tap.win.app.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
@@ -18,7 +30,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -124,6 +135,12 @@ fun AuthTextField(
     )
 }
 
+/**
+ * UNIFIED SOLID-COLOR PRIMARY BUTTON.
+ * Single flat brand color — no gradients, no stacked/overlapping layers.
+ * Every primary action in the app routes through this one component so all
+ * buttons share identical size (52dp), corner radius (16dp) and typography.
+ */
 @Composable
 fun GradientButton(
     text: String,
@@ -131,62 +148,55 @@ fun GradientButton(
     loading: Boolean = false,
     onClick: () -> Unit,
 ) {
-    val shape = RoundedCornerShape(16.dp)
-    Box(
+    Button(
+        onClick = onClick,
+        enabled = enabled && !loading,
+        shape = RoundedCornerShape(16.dp),
+        contentPadding = PaddingValues(vertical = 14.dp),
+        elevation = ButtonDefaults.buttonElevation(
+            defaultElevation = 2.dp, pressedElevation = 4.dp, disabledElevation = 0.dp,
+        ),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = Brand,
+            contentColor = Color.White,
+            disabledContainerColor = Color.White.copy(alpha = 0.12f),
+            disabledContentColor = Color.White.copy(alpha = 0.45f),
+        ),
         modifier = Modifier
             .fillMaxWidth()
-            // Soft colored glow behind the button (3D depth effect)
-            .shadow(
-                elevation = if (enabled && !loading) 14.dp else 0.dp,
-                shape = shape,
-                ambientColor = Brand.copy(alpha = 0.5f),
-                spotColor = Accent.copy(alpha = 0.6f),
-            ),
+            .heightIn(min = 52.dp),
     ) {
-        // Darker offset layer to fake physical depth
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .offset(y = 3.dp)
-                .background(Brush.horizontalGradient(listOf(BrandDark, Color(0xFF0A7E66))), shape),
-        )
-        Button(
-            onClick = onClick,
-            enabled = enabled && !loading,
-            shape = shape,
-            contentPadding = PaddingValues(vertical = 14.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = Color.Transparent,
-                disabledContentColor = Color.White.copy(alpha = 0.5f),
-            ),
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 52.dp),
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        brush = if (enabled) {
-                            Brush.horizontalGradient(listOf(Brand, Color(0xFF9B5CF6), Accent))
-                        } else {
-                            Brush.horizontalGradient(
-                                listOf(Color.Gray.copy(alpha = 0.5f), Color.Gray.copy(alpha = 0.35f)),
-                            )
-                        },
-                    ),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (loading) {
-                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(22.dp))
-                } else {
-                    Text(
-                        text = text,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = Color.White,
-                    )
-                }
-            }
+        if (loading) {
+            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(22.dp))
+        } else {
+            Text(text = text, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+        }
+    }
+}
+
+/** Unified SECONDARY button: flat outline style, same size/shape as primary. */
+@Composable
+fun OutlineButton(
+    text: String,
+    enabled: Boolean = true,
+    loading: Boolean = false,
+    onClick: () -> Unit,
+) {
+    OutlinedButton(
+        onClick = onClick,
+        enabled = enabled && !loading,
+        shape = RoundedCornerShape(16.dp),
+        border = androidx.compose.foundation.BorderStroke(1.5.dp, Brand),
+        contentPadding = PaddingValues(vertical = 14.dp),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = Brand),
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 52.dp),
+    ) {
+        if (loading) {
+            CircularProgressIndicator(color = Brand, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+        } else {
+            Text(text = text, fontWeight = FontWeight.Bold, fontSize = 15.sp)
         }
     }
 }
@@ -513,7 +523,13 @@ private fun VerifyForm(onModeChange: (AuthMode) -> Unit, onAuthenticated: (AuthR
                 Text(it, color = Accent, modifier = Modifier.padding(14.dp), textAlign = TextAlign.Start)
             }
         }
-        Text("أرسلنا رمز تحقق إلى ${'$'}{pending.user.email}", color = Color.White.copy(alpha = 0.75f))
+        Text(
+            "أرسلنا رمز تحقق مكوّنًا من 6 أرقام إلى بريدك الإلكتروني (${pending.user.email})، صالح لمدة 15 دقيقة.",
+            color = Color.White.copy(alpha = 0.85f),
+            fontSize = 14.sp,
+            textAlign = TextAlign.Start,
+            modifier = Modifier.fillMaxWidth(),
+        )
         // When no email provider (RESEND_API_KEY) is configured, the backend returns the code
         // directly for testing — surface it here so verification can be completed.
         pending.dev_code?.let {
@@ -536,7 +552,7 @@ private fun VerifyForm(onModeChange: (AuthMode) -> Unit, onAuthenticated: (AuthR
                 } else error = errorMessage(res)
             }
         })
-        GradientButton(text = "إعادة إرسال الرمز", enabled = !loading, onClick = {
+        OutlineButton(text = "إعادة إرسال الرمز", enabled = !loading, onClick = {
             kotlinx.coroutines.MainScope().launch {
                 runCatching {
                     ApiClient.authApi.resendVerification("Bearer ${'$'}{pending.tokens.accessToken}")
@@ -603,19 +619,28 @@ fun GoogleSignInButton(
                 if (!launched) loading = false
             }
         },
-        shape = RoundedCornerShape(14.dp),
-        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)),
+        shape = RoundedCornerShape(16.dp),
+        colors = ButtonDefaults.outlinedButtonColors(
+            containerColor = Color.White,
+            contentColor = Color(0xFF1F1F1F),
+        ),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.85f)),
+        elevation = ButtonDefaults.outlinedButtonElevation(defaultElevation = 2.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .height(52.dp),
+            .heightIn(min = 52.dp)
+            .alpha(if (loading) 0.7f else 1f),
     ) {
         if (loading) {
-            CircularProgressIndicator(color = Brand, modifier = Modifier.size(20.dp))
+            CircularProgressIndicator(color = Brand, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
         } else {
-            Icon(Icons.Filled.MailOutline, contentDescription = null, tint = Color(0xFFEA4335))
+            Image(
+                painter = painterResource(id = R.drawable.ic_google_logo),
+                contentDescription = "Google",
+                modifier = Modifier.size(20.dp),
+            )
             Spacer(Modifier.width(10.dp))
-            Text("المتابعة باستخدام حساب Google", fontWeight = FontWeight.SemiBold)
+            Text("المتابعة باستخدام حساب Google", fontWeight = FontWeight.Bold, fontSize = 15.sp)
         }
     }
 }
