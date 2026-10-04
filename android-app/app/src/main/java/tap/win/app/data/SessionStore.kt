@@ -9,7 +9,7 @@ import androidx.security.crypto.MasterKey
  */
 class SessionStore(context: Context) {
 
-    private val prefs = run {
+    private val prefs = runCatching {
         val masterKey = MasterKey.Builder(context)
             .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
             .build()
@@ -20,6 +20,13 @@ class SessionStore(context: Context) {
             EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
             EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
         )
+    }.getOrElse { e ->
+        // EncryptedSharedPreferences can fail on some devices (AndroidKeyStore
+        // glitches, corrupted keystore entries). Falling back to plain prefs
+        // keeps the app usable instead of crashing on launch. The session store
+        // is rebuilt automatically once secure storage works again.
+        android.util.Log.e("TapWin", "EncryptedSharedPreferences init failed, using fallback", e)
+        context.getSharedPreferences("session_fallback", Context.MODE_PRIVATE)
     }
 
     var accessToken: String?

@@ -14,21 +14,28 @@ import java.util.concurrent.TimeUnit
 object ApiClient {
 
     val deviceId: String by lazy {
-        Settings.Secure.getString(
-            AppContextHolder.context.contentResolver,
-            Settings.Secure.ANDROID_ID,
-        ) ?: "android-unknown"
+        runCatching {
+            Settings.Secure.getString(
+                AppContextHolder.context.contentResolver,
+                Settings.Secure.ANDROID_ID,
+            )
+        }.getOrNull() ?: "android-unknown"
     }
 
     val deviceName: String by lazy {
         "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}"
     }
 
-    private val session = SessionStore(AppContextHolder.context)
+    // Lazy + guarded: constructing EncryptedSharedPreferences can throw on some
+    // devices (e.g. AndroidKeyStore glitches); doing it eagerly at class-init
+    // used to crash the app on launch before any UI was shown.
+    private val session: SessionStore? by lazy {
+        runCatching { SessionStore(AppContextHolder.context) }.getOrNull()
+    }
 
     private val authInterceptor = Interceptor { chain ->
         val original = chain.request()
-        val token = session.accessToken
+        val token = session?.accessToken
         val request = if (token != null && !original.url.encodedPath.contains("/auth/refresh")) {
             original.newBuilder()
                 .header("Authorization", "Bearer $token")

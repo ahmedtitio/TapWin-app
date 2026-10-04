@@ -12,6 +12,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import tap.win.app.api.ApiClient
 import tap.win.app.api.AuthResponse
 import tap.win.app.data.SessionStore
@@ -77,20 +78,33 @@ class MainActivity : ComponentActivity() {
                 }
         }
 
-        setContent {
-            MaterialTheme(
-                colorScheme = darkColorScheme(
-                    primary = Color(0xFF6C4DF6),
-                    secondary = Color(0xFF00D4AA),
-                    background = Color(0xFF120B33),
-                    surface = Color(0xFF1D1445),
-                    onBackground = Color.White,
-                    onSurface = Color.White,
-                ),
-                typography = Typography(),
-            ) {
-                AppNav(session = session, activity = this@MainActivity)
+        // Wrap the entire UI attach in a guard: if anything throws during the
+        // first composition (e.g. missing resource), show an Arabic error and
+        // exit cleanly instead of the system "app keeps stopping" dialog.
+        try {
+            setContent {
+                MaterialTheme(
+                    colorScheme = darkColorScheme(
+                        primary = Color(0xFF6C4DF6),
+                        secondary = Color(0xFF00D4AA),
+                        background = Color(0xFF120B33),
+                        surface = Color(0xFF1D1445),
+                        onBackground = Color.White,
+                        onSurface = Color.White,
+                    ),
+                    typography = Typography(),
+                ) {
+                    AppNav(session = session, activity = this@MainActivity)
+                }
             }
+        } catch (e: Throwable) {
+            android.util.Log.e("TapWin", "UI init failed", e)
+            android.widget.Toast.makeText(
+                this,
+                "تعذر تشغيل الواجهة: ${e.message ?: e.javaClass.simpleName}",
+                android.widget.Toast.LENGTH_LONG,
+            ).show()
+            finish()
         }
     }
 }
@@ -110,10 +124,14 @@ private fun SessionSplash() {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
-                Image(
-                    painter = painterResource(tap.win.app.R.mipmap.ic_launcher),
-                    contentDescription = null,
-                    modifier = Modifier.size(72.dp),
+                // App name text instead of the launcher mipmap: adaptive-icon
+                // mipmaps are not guaranteed to be loadable as a Painter on all
+                // devices/SDKs and used to throw Resources$NotFoundException.
+                Text(
+                    "Tap Win",
+                    color = Color.White,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 28.sp,
                 )
                 Spacer(Modifier.height(16.dp))
                 CircularProgressIndicator(color = Color(0xFF6C4DF6), strokeWidth = 3.dp)
