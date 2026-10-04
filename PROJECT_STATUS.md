@@ -29,9 +29,9 @@
 
 | Commit | التاريخ | الوصف |
 |---|---|---|
+| `e0f29ac` (HEAD على GitHub ✅) | 2026-10-04 | Codemagic: نسخ الـ keystore إلى مجلد clone + حل مسار التوقيع بين الخطوات؛ Android: عرض dev_code في شاشة Verify؛ تحديث هذا الملف |
 | `fa7eb2a` | 2026-10-04 | User web dashboard: OTP verification step on login for unverified accounts |
 | `cd87c64` | 2026-10-04 | ملف PROJECT_STATUS.md + إصلاحات auth المعلّقة (SessionStore userId String، شاشة Verify، OTP forgot/reset) |
-| (غير مدفوع بعد) | 2026-10-04 | Codemagic: نسخ الـ keystore إلى مجلد clone + حل مسار التوقيع بين الخطوات (سبب فشل بناء #16/#18)؛ Android: عرض dev_code في شاشة Verify |
 | `decf865` | 2026-10-04 | Backend: قبول `name` كمرادف لـ `full_name` في register (إصلاح VALIDATION crash) + إصلاح استيراد Analytics |
 | `7a68472` | 2026-10-04 | إصلاح أخطاء Kotlin: استيراد VerifyEmailRequest + إغلاق قوس Analytics |
 | `8b113d5` | 2026-10-04 | Backend: رموز تحقق البريد (جدول email_codes، verify-email/resend، OTP forgot/reset، دعم Resend API) |
