@@ -85,7 +85,8 @@ dependencies {
     // Firebase Auth (Google sign-in) + Google Analytics for Firebase
     implementation(platform("com.google.firebase:firebase-bom:33.3.0"))
     implementation("com.google.firebase:firebase-auth")
-    implementation("com.google.android.gms:play-services-auth:21.2.0")
+    // 21.4.0+: SignInClient.getCredentialFromIntent(Intent) exists (older versions only had registry-based CredentialEntry)
+    implementation("com.google.android.gms:play-services-auth:21.4.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.1")
     implementation("com.google.firebase:firebase-analytics-ktx")
     implementation("com.google.firebase:firebase-messaging-ktx")
