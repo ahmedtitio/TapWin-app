@@ -27,7 +27,39 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        session = SessionStore(applicationContext)
+
+        // Global crash guard: any uncaught exception (e.g. a failed secure-storage
+        // init or a presence-service start issue) is reported as a readable toast
+        // instead of silently force-closing the app.
+        val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { t, e ->
+            runCatching {
+                android.util.Log.e("TapWin", "Uncaught in ${t.name}", e)
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    android.widget.Toast.makeText(
+                        this,
+                        "حدث خطأ غير متوقع: ${e.message ?: e.javaClass.simpleName}",
+                        android.widget.Toast.LENGTH_LONG,
+                    ).show()
+                }
+            }
+            defaultHandler?.uncaughtException(t, e)
+        }
+
+        // EncryptedSharedPreferences can occasionally fail to initialize on some
+        // devices; if it does we must not crash — fall back gracefully.
+        session = try {
+            SessionStore(applicationContext)
+        } catch (e: Throwable) {
+            android.util.Log.e("TapWin", "SessionStore init failed", e)
+            runCatching { SessionStore(applicationContext) }.getOrNull()
+                ?: return finish().also {
+                    android.widget.Toast.makeText(
+                        this, "تعذر تجهيز التخزين الآمن على هذا الجهاز",
+                        android.widget.Toast.LENGTH_LONG,
+                    ).show()
+                }
+        }
 
         setContent {
             MaterialTheme(
@@ -66,9 +98,14 @@ private fun AppNav(session: SessionStore, activity: ComponentActivity) {
                 }.getOrNull()
                 if (res?.isSuccessful == true && res.body() != null) {
                     val body = res.body()!!
-                    session.save(body.tokens.accessToken, body.tokens.refreshToken, body.user.id.toString())
-                    auth = body
-                    MyApp.startPresence(activity.application)
+                    try {
+                        session.save(body.tokens.accessToken, body.tokens.refreshToken, body.user.id.toString())
+                        runCatching { MyApp.startPresence(activity.application) }
+                        auth = body
+                    } catch (e: Throwable) {
+                        android.util.Log.e("TapWin", "session restore failed", e)
+                        session.clear()
+                    }
                 } else {
                     // Refresh failed (expired/revoked) -> start clean at the login screen.
                     session.clear()
@@ -83,7 +120,7 @@ private fun AppNav(session: SessionStore, activity: ComponentActivity) {
             session = session,
             user = current.user,
             onLogout = {
-                MyApp.stopPresence(activity.application)
+                runCatching { MyApp.stopPresence(activity.application) }
                 auth = null
                 mode = AuthMode.Login
             },
@@ -93,9 +130,20 @@ private fun AppNav(session: SessionStore, activity: ComponentActivity) {
             mode = mode,
             onModeChange = { mode = it },
             onAuthenticated = { resp ->
-                session.save(resp.tokens.accessToken, resp.tokens.refreshToken, resp.user.id.toString())
-                auth = resp
-                MyApp.startPresence(activity.application)
+                // Guard the whole transition: a storage/persistence failure here must
+                // show an error instead of force-closing the app right after login.
+                try {
+                    session.save(resp.tokens.accessToken, resp.tokens.refreshToken, resp.user.id.toString())
+                    auth = resp
+                    runCatching { MyApp.startPresence(activity.application) }
+                } catch (e: Throwable) {
+                    android.util.Log.e("TapWin", "post-login transition failed", e)
+                    android.widget.Toast.makeText(
+                        activity,
+                        "تعذر حفظ الجلسة: ${e.message ?: e.javaClass.simpleName}",
+                        android.widget.Toast.LENGTH_LONG,
+                    ).show()
+                }
             },
         )
     }

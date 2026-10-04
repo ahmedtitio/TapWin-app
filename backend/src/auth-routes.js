@@ -202,9 +202,12 @@ router.post('/login', async (req, res) => {
       await logLogin(user.id, email, false, req);
       return res.status(403).json({ error: 'ACCOUNT_DISABLED', message: 'تم تعطيل هذا الحساب' });
     }
+    // If a legacy unverified account exists, re-send its verification code and
+    // surface it in the response so clients can complete verification inline.
+    let devCode = null;
     if (aud === 'app' && user.role !== 'admin' && user.email_verified === false) {
-      await logLogin(user.id, email, false, req);
-      return res.status(403).json({ error: 'EMAIL_NOT_VERIFIED', message: 'لم يتم تأكيد بريدك الإلكتروني بعد. افتح التطبيق وأدخل رمز التحقق، أو استخدم "نسيت كلمة السر" لإعادة الإرسال.' });
+      devCode = await issueEmailCode(user.id, 'verify_email', user.email, user.full_name, 'verify')
+        .catch(() => null);
     }
 
     await query('UPDATE users SET last_login_at=now(), failed_attempts=0, locked_until=NULL WHERE id=$1', [user.id]);
@@ -228,7 +231,15 @@ router.post('/login', async (req, res) => {
     await storeRefreshToken(user.id, refreshToken, device_id);
     await logLogin(user.id, email, true, req);
 
-    res.json({ user: publicUser, tokens: { accessToken, refreshToken } });
+    res.json({
+      user: publicUser,
+      tokens: { accessToken, refreshToken },
+      email_verified: publicUser.email_verified,
+      ...(devCode ? { dev_code: devCode } : {}),
+      message: publicUser.email_verified
+        ? null
+        : 'تم تسجيل الدخول! أدخل رمز التحقق المرسل إلى بريدك الإلكتروني لتفعيل الحساب.',
+    });
   } catch (e) {
     console.error('[login] error:', String(e?.stack || e).slice(0, 1000));
     res.status(500).json({ error: 'SERVER_ERROR', message: String(e?.message || e).slice(0, 200) });

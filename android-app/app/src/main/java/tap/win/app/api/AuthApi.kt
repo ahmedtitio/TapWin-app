@@ -4,7 +4,7 @@ import com.google.gson.annotations.SerializedName
 import retrofit2.http.*
 
 data class User(
-    val id: Int,
+    val id: String,
     @SerializedName("full_name") val fullName: String,
     val username: String,
     val email: String,
@@ -23,6 +23,9 @@ data class Tokens(
 data class AuthResponse(
     val user: User,
     val tokens: Tokens,
+    @SerializedName("email_verified") val emailVerified: Boolean = true,
+    val message: String? = null,
+    val dev_code: String? = null,
 )
 
 data class LoginRequest(

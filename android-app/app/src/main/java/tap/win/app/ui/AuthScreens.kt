@@ -17,11 +17,14 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.window.Dialog
 import tap.win.app.api.ApiError
@@ -125,28 +128,139 @@ fun GradientButton(
     loading: Boolean = false,
     onClick: () -> Unit,
 ) {
-    Button(
-        onClick = onClick,
-        enabled = enabled && !loading,
-        shape = RoundedCornerShape(14.dp),
-        contentPadding = PaddingValues(vertical = 14.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+    val shape = RoundedCornerShape(16.dp)
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(52.dp),
+            // Soft colored glow behind the button (3D depth effect)
+            .shadow(
+                elevation = if (enabled && !loading) 14.dp else 0.dp,
+                shape = shape,
+                ambientColor = Brand.copy(alpha = 0.5f),
+                spotColor = Accent.copy(alpha = 0.6f),
+            ),
     ) {
+        // Darker offset layer to fake physical depth
         Box(
             modifier = Modifier
-                .fillMaxSize()
-                .background(Brush.horizontalGradient(listOf(Brand, Accent))),
-            contentAlignment = Alignment.Center,
+                .matchParentSize()
+                .offset(y = 3.dp)
+                .background(Brush.horizontalGradient(listOf(BrandDark, Color(0xFF0A7E66))), shape),
+        )
+        Button(
+            onClick = onClick,
+            enabled = enabled && !loading,
+            shape = shape,
+            contentPadding = PaddingValues(vertical = 14.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color.Transparent,
+                disabledContentColor = Color.White.copy(alpha = 0.5f),
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 52.dp),
         ) {
-            if (loading) {
-                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(22.dp))
-            } else {
-                Text(text, fontWeight = FontWeight.Bold, color = Color.White)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        brush = if (enabled) {
+                            Brush.horizontalGradient(listOf(Brand, Color(0xFF9B5CF6), Accent))
+                        } else {
+                            Brush.horizontalGradient(
+                                listOf(Color.Gray.copy(alpha = 0.5f), Color.Gray.copy(alpha = 0.35f)),
+                            )
+                        },
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (loading) {
+                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(22.dp))
+                } else {
+                    Text(
+                        text,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color.White,
+                        letterSpacing = 0.5.dp,
+                    )
+                }
             }
         }
+    }
+}
+
+/** White "Continue with Google" button with the official multi-color G mark. */
+@Composable
+fun GoogleGradientButton(
+    enabled: Boolean = true,
+    loading: Boolean = false,
+    onClick: () -> Unit,
+) {
+    val shape = RoundedCornerShape(16.dp)
+    Surface(
+        onClick = onClick,
+        enabled = enabled && !loading,
+        shape = shape,
+        color = Color.White,
+        tonalElevation = 2.dp,
+        shadowElevation = 10.dp,
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp, Color.White.copy(alpha = 0.85f),
+        ),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(52.dp)
+            .alpha(if (enabled && !loading) 1f else 0.55f),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxSize(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (loading) {
+                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = Brand)
+            } else {
+                GoogleGLogo(size = 22.dp)
+            }
+            Spacer(Modifier.width(12.dp))
+            Text(
+                "المتابعة باستخدام حساب Google",
+                fontWeight = FontWeight.Bold,
+                fontSize = 15.sp,
+                color = Color(0xFF1F1F1F),
+            )
+        }
+    }
+}
+
+/** Real vector Google "G" logo (official brand paths) — not an emoji. */
+@Composable
+fun GoogleGLogo(size: androidx.compose.ui.unit.Dp = 24.dp) {
+    val scaleBase = 52f // the brand path set is authored on a ~52x52 viewport
+    androidx.compose.foundation.Canvas(modifier = Modifier.size(size)) {
+        val s = this.size.minDimension / scaleBase
+        fun seg(d: String, color: Color) {
+            val p = androidx.compose.ui.graphics.Path()
+            androidx.compose.ui.graphics.vector.PathParser(d).toPath(p)
+            p.transform(android.graphics.Matrix().apply { preScale(s, s) })
+            drawPath(p, color)
+        }
+        seg(
+            "M25.99 9.46c3.42 0 6.5 1.18 8.92 3.49l6.64-6.64C37.95 2.72 32.34 0 25.99 0 15.99 0 7.29 6.32 3.79 15.36l7.74 6c2.18-6.52 8.41-11.9 14.46-11.9z",
+            Color(0xFFEA4335),
+        )
+        seg(
+            "M50.01 25.5c0-1.72-.15-3.38-.43-4.98H25.99v9.44h13.51c-.59 3.13-2.36 5.78-5.03 7.56l7.73 6c4.52-4.18 7.81-10.36 7.81-18.02z",
+            Color(0xFF4285F4),
+        )
+        seg(
+            "M11.53 28.64a15.3 15.3 0 0 1-.82-4.64c0-1.61.29-3.18.81-4.66l-7.73-6C2.35 17.52 1.5 21.34 1.5 25.31s.85 7.79 2.29 11.29l7.74-6.02z",
+            Color(0xFFFBBB04),
+        )
+        seg(
+            "M25.99 50.62c6.35 0 11.7-2.09 15.61-5.68l-7.73-6c-2.1 1.41-4.89 2.25-7.88 2.25-6.05 0-11.27-3.86-13.13-9.25l-7.74 6c3.49 9.04 12.19 12.68 20.87 12.68z",
+            Color(0xFF34A853),
+        )
     }
 }
 
