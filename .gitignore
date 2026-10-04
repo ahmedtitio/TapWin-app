@@ -1,8 +1,9 @@
 node_modules/
 dist/
 .wrangler/
-.gradle/
-build/
 *.log
-.env.local
-backend/.dev.vars
+.env
+.env.*
+CM_KEYSTORE_BASE64.txt
+android-app/tapwin-release.jks
+secrets/

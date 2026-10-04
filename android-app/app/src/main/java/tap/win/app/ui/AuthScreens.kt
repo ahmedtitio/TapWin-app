@@ -21,6 +21,15 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.PathFillType
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.group
+import androidx.compose.ui.graphics.vector.addPath
+import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -232,52 +241,64 @@ fun GoogleGradientButton(
     }
 }
 
-/** Real vector Google "G" logo (official brand paths) — not an emoji. */
-@Composable
-fun GoogleGLogo(size: androidx.compose.ui.unit.Dp = 24.dp) {
-    val scaleBase = 52f // the brand path set is authored on a ~52x52 viewport
-    val paths = rememberGoogleGPaths()
-    androidx.compose.foundation.Canvas(modifier = Modifier.size(size)) {
-        val s = this.size.minDimension / scaleBase
-        fun seg(p0: androidx.compose.ui.graphics.Path, color: Color) {
-            val p = p0.copy()
-            p.transform(androidx.compose.ui.graphics.Matrix().apply { scale(s, s) })
-            drawPath(p, color)
+/**
+ * Real vector Google "G" logo (official brand paths) — not an emoji.
+ *
+ * Implemented with ImageVector + Group/Path (androidx.compose.ui.graphics.vector)
+ * which works with every Compose version — no PathParser(String)/Path.copy()
+ * APIs that are unavailable on the project's compose-compiler (1.5.14).
+ */
+private val GoogleGVector: ImageVector by lazy {
+    // The brand path set is authored on a ~52x52 viewport.
+    val w = 52f
+    val h = 52f
+    ImageVector.Builder(
+        name = "GoogleG",
+        defaultWidth = 24.dp,
+        defaultHeight = 24.dp,
+        viewportWidth = w,
+        viewportHeight = h,
+    ).group(
+        name = "google-g",
+        rotate = 0f,
+        scaleX = 1f,
+        scaleY = 1f,
+        translationX = 0f,
+        translationY = 0f,
+        pivotX = w / 2f,
+        pivotY = h / 2f,
+        clipPathData = emptyList(),
+    ) {
+        fun gseg(d: String, color: Color, nm: String) {
+            addPath(
+                pathData = PathParser().parsePathString(d).nodes,
+                name = nm,
+                fill = SolidColor(color),
+                fillAlpha = 1f,
+                stroke = null,
+                strokeAlpha = 1f,
+                strokeLineWidth = 0f,
+                strokeLineCap = StrokeCap.Butt,
+                strokeLineJoin = StrokeJoin.Miter,
+                strokeLineMiter = 1f,
+                pathFillType = PathFillType.NonZero,
+            )
         }
-        seg(
-            paths[0],
-            Color(0xFFEA4335),
-        )
-        seg(
-            paths[1],
-            Color(0xFF4285F4),
-        )
-        seg(
-            paths[2],
-            Color(0xFFFBBB04),
-        )
-        seg(
-            paths[3],
-            Color(0xFF34A853),
-        )
-    }
+        gseg("M25.99 9.46c3.42 0 6.5 1.18 8.92 3.49l6.64-6.64C37.95 2.72 32.34 0 25.99 0 15.99 0 7.29 6.32 3.79 15.36l7.74 6c2.18-6.52 8.41-11.9 14.46-11.9z", Color(0xFFEA4335), "arc-red")
+        gseg("M50.01 25.5c0-1.72-.15-3.38-.43-4.98H25.99v9.44h13.51c-.59 3.13-2.36 5.78-5.03 7.56l7.73 6c4.52-4.18 7.81-10.36 7.81-18.02z", Color(0xFF4285F4), "arc-blue")
+        gseg("M11.53 28.64a15.3 15.3 0 0 1-.82-4.64c0-1.61.29-3.18.81-4.66l-7.73-6C2.35 17.52 1.5 21.34 1.5 25.31s.85 7.79 2.29 11.29l7.74-6.02z", Color(0xFFFBBB04), "arc-yellow")
+        gseg("M25.99 50.62c6.35 0 11.7-2.09 15.61-5.68l-7.73-6c-2.1 1.41-4.89 2.25-7.88 2.25-6.05 0-11.27-3.86-13.13-9.25l-7.74 6c3.49 9.04 12.19 12.68 20.87 12.68z", Color(0xFF34A853), "arc-green")
+    }.build()
 }
 
-/** Pre-parsed official Google "G" brand paths (parsed once per composition). */
-@androidx.compose.runtime.Composable
-private fun rememberGoogleGPaths(): List<androidx.compose.ui.graphics.Path> =
-    androidx.compose.runtime.remember {
-        listOf(
-            "M25.99 9.46c3.42 0 6.5 1.18 8.92 3.49l6.64-6.64C37.95 2.72 32.34 0 25.99 0 15.99 0 7.29 6.32 3.79 15.36l7.74 6c2.18-6.52 8.41-11.9 14.46-11.9z",
-            "M50.01 25.5c0-1.72-.15-3.38-.43-4.98H25.99v9.44h13.51c-.59 3.13-2.36 5.78-5.03 7.56l7.73 6c4.52-4.18 7.81-10.36 7.81-18.02z",
-            "M11.53 28.64a15.3 15.3 0 0 1-.82-4.64c0-1.61.29-3.18.81-4.66l-7.73-6C2.35 17.52 1.5 21.34 1.5 25.31s.85 7.79 2.29 11.29l7.74-6.02z",
-            "M25.99 50.62c6.35 0 11.7-2.09 15.61-5.68l-7.73-6c-2.1 1.41-4.89 2.25-7.88 2.25-6.05 0-11.27-3.86-13.13-9.25l-7.74 6c3.49 9.04 12.19 12.68 20.87 12.68z",
-        ).map { d ->
-            val p = androidx.compose.ui.graphics.Path()
-            androidx.compose.ui.graphics.vector.PathParser(d).toPath(p)
-            p
-        }
-    }
+@Composable
+fun GoogleGLogo(size: androidx.compose.ui.unit.Dp = 24.dp) {
+    Image(
+        imageVector = GoogleGVector,
+        contentDescription = "Google",
+        modifier = Modifier.size(size),
+    )
+}
 
 /** Extracts the Arabic error message from an API error response. */
 fun errorMessage(raw: Response<*>): String {
