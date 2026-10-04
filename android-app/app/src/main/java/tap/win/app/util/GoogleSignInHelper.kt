@@ -82,17 +82,11 @@ object GoogleSignInHelper {
     suspend fun finishSignIn(activity: Activity, data: Intent?): Result<AuthResponse> {
         if (data == null) return Result.failure(Exception("لم يتم اختيار حساب Google"))
         return try {
-            // The Identity (Sign-In) API returns a Credential whose token field is
-            // the Google ID token when BeginSignInRequest used GoogleIdTokenRequestOptions.
-            // SignInClient.getCredentialFromIntent exists in play-services-auth 21.x;
-            // call it reflectively so the code compiles with any version on CI.
+            // play-services-auth 21.x: SignInClient.getCredentialFromIntent(Intent)
+            // returns a GoogleSignInCredential whose `token` is the Google ID token
+            // when BeginSignInRequest used GoogleIdTokenRequestOptions.
             val client = Identity.getSignInClient(activity)
-            val getCred = client.javaClass.methods.firstOrNull {
-                it.name == "getCredentialFromIntent" && it.parameterTypes.size == 1 &&
-                    Intent::class.java.isAssignableFrom(it.parameterTypes[0])
-            } ?: error("getCredentialFromIntent غير مدعوم في هذا الإصدار")
-            getCred.isAccessible = true
-            val credential = getCred.invoke(client, data) as? com.google.android.gms.auth.api.signin.GoogleSignInCredential
+            val credential = client.getCredentialFromIntent(data)
             val idToken = credential?.token
                 ?: return Result.failure(Exception("تعذّر الحصول على رمز Google"))
 
@@ -107,7 +101,7 @@ object GoogleSignInHelper {
             val firebaseToken = firebaseUser.getIdToken(true).await()
             val response = ApiClient.authApi.firebaseLogin(
                 FirebaseLoginRequest(
-                    idToken = firebaseToken.token!!,
+                    idToken = firebaseToken?.token ?: firebaseUser.uid,
                     deviceId = ApiClient.deviceId,
                     deviceName = ApiClient.deviceName,
                 ),
