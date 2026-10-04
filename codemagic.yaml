@@ -43,28 +43,27 @@ workflows:
           if [ -z "$KS" ]; then
             echo "CM_KEYSTORE is not set – see comments at top of codemagic.yaml"; exit 1;
           fi
-          echo "$KS" | tr -d ' \n\r' | base64 --decode > $CM_BUILD_DIR/release.keystore
+          # Write the base64 to a file first (avoids shell quoting issues with long strings)
+          printf '%s' "$KS" > $CM_BUILD_DIR/keystore.b64
+          tr -d ' \n\r\t' < $CM_BUILD_DIR/keystore.b64 | base64 --decode > $CM_BUILD_DIR/release.keystore
           if [ ! -s $CM_BUILD_DIR/release.keystore ]; then echo "ERROR: decoded keystore is empty"; exit 1; fi
           # sanity check: must be a valid JKS/PKCS12 keystore
           keytool -list -keystore $CM_BUILD_DIR/release.keystore -storepass "$CM_KEYSTORE_PASSWORD" >/dev/null 2>&1 \
             || { echo "ERROR: invalid keystore or wrong CM_KEYSTORE_PASSWORD"; exit 1; }
-          echo "Keystore OK"
+          echo "Keystore OK ($(wc -c < $CM_BUILD_DIR/release.keystore) bytes)"
       - name: Build Release APK + AAB
         script: |
-          # make vars available & visible to all following steps
-          for v in API_BASE_URL GA_MEASUREMENT_ID GOOGLE_WEB_CLIENT_ID CM_KEYSTORE_PASSWORD CM_KEY_ALIAS CM_KEY_PASSWORD; do
-            eval "echo \"$v=${!v}\"" >> $CM_ENV
-          done
           cd "$CM_BUILD_DIR/../clone/android-app"
           chmod +x gradlew
           ./gradlew assembleRelease bundleRelease \
-            -PAPI_BASE_URL="$API_BASE_URL" \
-            -PGA_MEASUREMENT_ID="$GA_MEASUREMENT_ID" \
-            -PGOOGLE_WEB_CLIENT_ID="$GOOGLE_WEB_CLIENT_ID" \
-            -Pandroid.injected.signing.store.file=$CM_BUILD_DIR/release.keystore \
-            -Pandroid.injected.signing.store.password=$CM_KEYSTORE_PASSWORD \
-            -Pandroid.injected.signing.key.alias=$CM_KEY_ALIAS \
-            -Pandroid.injected.signing.key.password=$CM_KEY_PASSWORD
+            "-PAPI_BASE_URL=$API_BASE_URL" \
+            "-PGA_MEASUREMENT_ID=$GA_MEASUREMENT_ID" \
+            "-PGOOGLE_WEB_CLIENT_ID=$GOOGLE_WEB_CLIENT_ID" \
+            "-Pandroid.injected.signing.store.file=$CM_BUILD_DIR/release.keystore" \
+            "-Pandroid.injected.signing.store.password=$CM_KEYSTORE_PASSWORD" \
+            "-Pandroid.injected.signing.key.alias=$CM_KEY_ALIAS" \
+            "-Pandroid.injected.signing.key.password=$CM_KEY_PASSWORD" \
+            --no-daemon --stacktrace
       - name: Stage artifacts
         script: |
           mkdir -p $CM_BUILD_DIR/output

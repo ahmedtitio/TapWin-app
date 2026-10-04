@@ -134,7 +134,7 @@ private fun Card3D(content: @Composable ColumnScope.() -> Unit) {
 private fun StatTile(title: String, value: String, icon: androidx.compose.ui.graphics.vector.ImageVector, colors: List<Color>) {
     Card3D {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon3D(icon, colors, size = 48)
+            Icon3D(icon = icon, colors = colors, size = 48)
             Spacer(Modifier.width(14.dp))
             Column {
                 Text(value, color = Color.White, fontWeight = FontWeight.ExtraBold,

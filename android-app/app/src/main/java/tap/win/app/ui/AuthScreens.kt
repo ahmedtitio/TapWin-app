@@ -120,9 +120,9 @@ fun AuthTextField(
 @Composable
 fun GradientButton(
     text: String,
-    onClick: () -> Unit,
     enabled: Boolean = true,
     loading: Boolean = false,
+    onClick: () -> Unit,
 ) {
     Button(
         onClick = onClick,

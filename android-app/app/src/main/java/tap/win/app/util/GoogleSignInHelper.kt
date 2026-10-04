@@ -84,17 +84,29 @@ object GoogleSignInHelper {
         if (data == null) return Result.failure(Exception("لم يتم اختيار حساب Google"))
         return try {
             @Suppress("DEPRECATION")
-            val googleAccount = GoogleSignInAccount.getFromIntent(data)
+            val googleAccount = try {
+                // Static factory method resolved reflectively for cross-version safety.
+                val m = GoogleSignInAccount::class.java.getDeclaredMethod(
+                    "getFromIntent", Intent::class.java, Class.forName(
+                        "com.google.android.gms.common.api.Status"
+                    )
+                )
+                m.invoke(null, data, null) as? GoogleSignInAccount
+            } catch (e: NoSuchMethodException) {
+                val m = GoogleSignInAccount::class.java.getDeclaredMethod(
+                    "getFromIntent", Intent::class.java
+                )
+                m.invoke(null, data) as? GoogleSignInAccount
+            }
             val idToken = googleAccount?.id
                 ?: return Result.failure(Exception("تعذّر الحصول على رمز Google"))
 
             // 1) Exchange the Google ID token for a Firebase user.
-            val firebaseUser = suspendCancellableCoroutine { cont ->
-                FirebaseAuth.getInstance()
-                    .signInWithCredential(GoogleAuthProvider.getCredential(idToken, null))
-                    .addOnSuccessListener { result -> cont.resume(result.user!!) }
-                    .addOnFailureListener { e -> cont.resumeWithException(e) }
-            }
+            val firebaseResult = FirebaseAuth.getInstance()
+                .signInWithCredential(GoogleAuthProvider.getCredential(idToken, null))
+                .await()
+            val firebaseUser = firebaseResult.user
+                ?: return Result.failure(Exception("فشل تسجيل الدخول عبر Firebase"))
 
             // 2) Send the Firebase ID token to our backend to get a Tap Win session.
             val firebaseToken = firebaseUser.getIdToken(true).await()
