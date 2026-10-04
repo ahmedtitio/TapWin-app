@@ -18,7 +18,9 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // `aud` of a Google ID token issued to this app (Web client used by the Credential
 // API; env vars add any Android/legacy clients). Overridable via env.
 const GOOGLE_ALLOWED_AUDIENCES = new Set([
-  '777921904281-9udm9ghsbn7r2f5dpu9h8a1sem2rq73u.apps.googleusercontent.com', // Web client
+  '777921904281-qqsntmbbps23hcq51tfjts8s2gmajb19.apps.googleusercontent.com', // Web client (current, auto-created by Google Service)
+  '777921904281-h10gclmq1nif0nalavjdjkgk5sbn6un1.apps.googleusercontent.com', // Android client (package tap.win.app, SHA-1 0B:23:22:C0:...)
+  '777921904281-9udm9ghsbn7r2f5dpu9h8a1sem2rq73u.apps.googleusercontent.com', // Legacy web client id (older google-services.json / cached tokens)
 ].filter(Boolean));
 for (const v of [process.env.GOOGLE_WEB_CLIENT_ID, process.env.GOOGLE_ANDROID_CLIENT_ID]) {
   if (v) String(v).split(',').map((s) => s.trim()).filter(Boolean).forEach((x) => GOOGLE_ALLOWED_AUDIENCES.add(x));

@@ -14,7 +14,15 @@
       },
       "oauth_client": [
         {
-          "client_id": "777921904281-9udm9ghsbn7r2f5dpu9h8a1sem2rq73u.apps.googleusercontent.com",
+          "client_id": "777921904281-h10gclmq1nif0nalavjdjkgk5sbn6un1.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "tap.win.app",
+            "certificate_hash": "0b2322c044742d2c4b8a89fecf88b5eddd219160"
+          }
+        },
+        {
+          "client_id": "777921904281-qqsntmbbps23hcq51tfjts8s2gmajb19.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
@@ -27,7 +35,7 @@
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "777921904281-9udm9ghsbn7r2f5dpu9h8a1sem2rq73u.apps.googleusercontent.com",
+              "client_id": "777921904281-qqsntmbbps23hcq51tfjts8s2gmajb19.apps.googleusercontent.com",
               "client_type": 3
             }
           ]
