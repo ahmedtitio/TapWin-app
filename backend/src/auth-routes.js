@@ -14,9 +14,15 @@ const router = Router();
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // OAuth Web client id (from google-services.json, project tapwin-app) — the
 // audience of Google ID tokens issued to the Android app. Overridable via env.
-const GOOGLE_ANDROID_CLIENT_ID =
-  process.env.GOOGLE_WEB_CLIENT_ID ||
-  '777921904281-9udm9ghsbn7r2f5dpu9h8a1sem2rq73u.apps.googleusercontent.com';
+// All OAuth client ids belonging to project tapwin-app that may appear as the
+// `aud` of a Google ID token issued to this app (Web client used by the Credential
+// API; env vars add any Android/legacy clients). Overridable via env.
+const GOOGLE_ALLOWED_AUDIENCES = new Set([
+  '777921904281-9udm9ghsbn7r2f5dpu9h8a1sem2rq73u.apps.googleusercontent.com', // Web client
+].filter(Boolean));
+for (const v of [process.env.GOOGLE_WEB_CLIENT_ID, process.env.GOOGLE_ANDROID_CLIENT_ID]) {
+  if (v) String(v).split(',').map((s) => s.trim()).filter(Boolean).forEach((x) => GOOGLE_ALLOWED_AUDIENCES.add(x));
+}
 const pwIssue = (p) => {
   if (!p || p.length < 8) return 'كلمة السر يجب أن تكون 8 أحرف على الأقل';
   if (!/[A-Za-z]/.test(p) || !/\d/.test(p)) return 'كلمة السر يجب أن تحتوي على حروف وأرقام';
@@ -393,12 +399,14 @@ async function verifyGoogleIdToken(idToken) {
   const p = decode(segs[1]);
 
   if (h.alg !== 'RS256' || !h.kid) throw new Error('BAD_TOKEN_FORMAT');
-  // Accept both the Web client id and the Android client id as audience:
-  // Credential-API tokens are aud=Web client; classic GoogleSignIn tokens
-  // are aud=Android client. Both are ours (project tapwin-app).
-  const allowedAud = new Set([GOOGLE_ANDROID_CLIENT_ID, process.env.GOOGLE_ANDROID_CLIENT_ID].filter(Boolean));
+  // Accept any OAuth client id belonging to our project as audience:
+  // Credential-API tokens are aud=Web client; classic GoogleSignIn tokens may
+  // carry a legacy generated client. All are ours (project tapwin-app).
   const audOk = Array.isArray(p.aud) ? p.aud : [p.aud];
-  if (!audOk.some((a) => allowedAud.has(String(a)))) throw new Error('BAD_AUDIENCE');
+  if (!audOk.some((a) => GOOGLE_ALLOWED_AUDIENCES.has(String(a)))) {
+    console.warn('[auth/google] BAD_AUDIENCE aud=', JSON.stringify(p.aud));
+    throw new Error('BAD_AUDIENCE');
+  }
   if (!p.exp || p.exp * 1000 < Date.now()) throw new Error('TOKEN_EXPIRED');
   if (!p.email) throw new Error('NO_EMAIL');
 
@@ -458,8 +466,17 @@ router.post('/firebase', async (req, res) => {
       try {
         fp = await verifyGoogleIdToken(presented);
       } catch (e) {
-        console.error('[auth/google] verify failed:', String(e?.message || e));
-        return res.status(401).json({ error: 'INVALID_GOOGLE_TOKEN', message: 'تعذر التحقق من حساب Google' });
+        const reason = String(e?.message || e);
+        console.error('[auth/google] verify failed:', reason, 'token_prefix=', String(presented).slice(0, 24));
+        const messages = {
+          BAD_TOKEN_FORMAT: 'صيغة رمز Google غير صحيحة — حدّث التطبيق وأعد المحاولة',
+          BAD_AUDIENCE: 'رمز Google صادر عن عميل OAuth آخر — تأكد من ضبط GOOGLE_WEB_CLIENT_ID في إعدادات Firebase/Google Cloud بنفس معرف العميل الخاص بالتطبيق',
+          TOKEN_EXPIRED: 'انتهت صلاحية رمز Google — أعد تسجيل الدخول',
+          NO_EMAIL: 'حساب Google لا يحتوي على بريد إلكتروني مؤكد',
+          UNKNOWN_KID: 'تعذر العثور على مفتاح عام لرمز Google — حاول مرة أخرى',
+          BAD_SIGNATURE: 'توقيع رمز Google غير صالح',
+        };
+        return res.status(401).json({ error: 'INVALID_GOOGLE_TOKEN', code: reason, message: messages[reason] || 'تعذر التحقق من حساب Google' });
       }
       fp.user_id = fp.sub;
     }

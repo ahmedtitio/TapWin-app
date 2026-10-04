@@ -230,7 +230,10 @@ object GoogleSignInHelper {
         if (response.isSuccessful && response.body() != null) return response.body()!!
         val msg = runCatching {
             response.errorBody()?.string()?.let { body ->
-                org.json.JSONObject(body).optString("message").ifBlank { null }
+                val j = org.json.JSONObject(body)
+                // Prefer the specific Arabic message from the backend; fall back to code.
+                j.optString("message").ifBlank { null } ?: j.optString("code").ifBlank { null }
+                    ?: j.optString("error").ifBlank { null }
             }
         }.getOrNull()
         throw Exception(msg ?: "فشل تسجيل الدخول عبر الخادم (${response.code()})")
