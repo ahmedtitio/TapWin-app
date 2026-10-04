@@ -12,6 +12,11 @@ import * as jwt from './jwt-lite.js';
 const router = Router();
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// OAuth Web client id (from google-services.json, project tapwin-app) — the
+// audience of Google ID tokens issued to the Android app. Overridable via env.
+const GOOGLE_ANDROID_CLIENT_ID =
+  process.env.GOOGLE_WEB_CLIENT_ID ||
+  '777921904281-9udm9ghsbn7r2f5dpu9h8a1sem2rq73u.apps.googleusercontent.com';
 const pwIssue = (p) => {
   if (!p || p.length < 8) return 'كلمة السر يجب أن تكون 8 أحرف على الأقل';
   if (!/[A-Za-z]/.test(p) || !/\d/.test(p)) return 'كلمة السر يجب أن تحتوي على حروف وأرقام';
@@ -370,18 +375,89 @@ async function verifyFirebaseIdToken(idToken) {
   return p;
 }
 
+/* ---- Google ID-token verification (direct, no Firebase project needed) ---- */
+// Verifies a Google-issued ID token against Google's OAuth public keys.
+// kid lookup goes through the JWKS endpoint so it keeps working after key rolls.
+async function verifyGoogleIdToken(idToken) {
+  const decode = (part) => {
+    let b = part.replace(/-/g, '+').replace(/_/g, '/');
+    b += '='.repeat((4 - (b.length % 4)) % 4);
+    const bin = atob(b);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return JSON.parse(new TextDecoder().decode(bytes));
+  };
+  const segs = String(idToken).split('.');
+  if (segs.length !== 3) throw new Error('BAD_TOKEN_FORMAT');
+  const h = decode(segs[0]);
+  const p = decode(segs[1]);
+
+  if (h.alg !== 'RS256' || !h.kid) throw new Error('BAD_TOKEN_FORMAT');
+  const audOk = Array.isArray(p.aud) ? p.aud : [p.aud];
+  if (!audOk.some((a) => String(a) === GOOGLE_ANDROID_CLIENT_ID)) throw new Error('BAD_AUDIENCE');
+  if (!p.exp || p.exp * 1000 < Date.now()) throw new Error('TOKEN_EXPIRED');
+  if (!p.email) throw new Error('NO_EMAIL');
+
+  if (!verifyGoogleIdToken._jwks || Date.now() > (verifyGoogleIdToken._jwksAt || 0)) {
+    const res = await fetch('https://www.googleapis.com/oauth2/v3/certs');
+    const jwks = await res.json();
+    const map = {};
+    for (const j of jwks.keys || []) map[j.kid] = j;
+    verifyGoogleIdToken._jwks = map;
+    const cc = (res.headers.get('cache-control') || '').match(/max-age=(\d+)/);
+    verifyGoogleIdToken._jwksAt = Date.now() + (cc ? Math.min(+cc[1], 3600) * 1000 : 1800000);
+  }
+  const jwk = verifyGoogleIdToken._jwks[h.kid];
+  if (!jwk) throw new Error('UNKNOWN_KID');
+
+  const key = await crypto.subtle.importKey(
+    'public',
+    { kty: 'RSA', n: jwk.n, e: jwk.e, alg: 'RS256', ext: true },
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+    false, ['verify'],
+  );
+  const signed = segs[0] + '.' + segs[1];
+  const sigB64 = segs[2].replace(/-/g, '+').replace(/_/g, '/');
+  const sigBin = atob(sigB64 + '='.repeat((4 - (sigB64.length % 4)) % 4));
+  const sig = new Uint8Array(sigBin.length);
+  for (let i = 0; i < sigBin.length; i++) sig[i] = sigBin.charCodeAt(i);
+  const ok = await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, sig, new TextEncoder().encode(signed));
+  if (!ok) throw new Error('BAD_SIGNATURE');
+  return p;
+}
+
 router.post('/firebase', async (req, res) => {
   try {
-    const { id_token, device_id, device_name, platform } = req.body || {};
-    if (!id_token) return res.status(400).json({ error: 'VALIDATION', message: 'رمز Firebase مفقود' });
+    const { id_token, google_id_token, device_id, device_name, platform } = req.body || {};
+    const presented = id_token || google_id_token;
+    if (!presented) return res.status(400).json({ error: 'VALIDATION', message: 'رمز Google مفقود' });
+
+    // The app sends either a Firebase ID token (legacy path) or a raw Google
+    // ID token (current path). Classify by the issuer claim before verifying.
+    let issuer = '';
+    try {
+      let b = presented.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+      b += '='.repeat((4 - (b.length % 4)) % 4);
+      issuer = String(JSON.parse(atob(b)).iss || '');
+    } catch { /* fall through to verification errors below */ }
 
     let fp;
-    try {
-      fp = await verifyFirebaseIdToken(id_token);
-    } catch (e) {
-      if (e.message === 'FIREBASE_NOT_CONFIGURED')
-        return res.status(501).json({ error: 'FIREBASE_NOT_CONFIGURED', message: 'لم يتم إعداد Firebase على الخادم' });
-      return res.status(401).json({ error: 'INVALID_FIREBASE_TOKEN', message: 'تعذر التحقق من حساب Google' });
+    if (issuer.includes('firebaseapp.com')) {
+      try {
+        fp = await verifyFirebaseIdToken(presented);
+      } catch (e) {
+        if (e.message === 'FIREBASE_NOT_CONFIGURED')
+          return res.status(501).json({ error: 'FIREBASE_NOT_CONFIGURED', message: 'لم يتم إعداد Firebase على الخادم' });
+        return res.status(401).json({ error: 'INVALID_FIREBASE_TOKEN', message: 'تعذر التحقق من حساب Google' });
+      }
+    } else {
+      try {
+        fp = await verifyGoogleIdToken(presented);
+      } catch (e) {
+        console.error('[auth/google] verify failed:', String(e?.message || e));
+        return res.status(401).json({ error: 'INVALID_GOOGLE_TOKEN', message: 'تعذر التحقق من حساب Google' });
+      }
+      fp.user_id = fp.sub;
     }
 
     const email = String(fp.email).toLowerCase();

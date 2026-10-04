@@ -19,6 +19,22 @@ import tap.win.app.ui.AuthMode
 import tap.win.app.ui.AuthScreen
 import tap.win.app.ui.HomeScreen
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -79,10 +95,44 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+/** Small centered splash shown while a saved session is being restored. */
+@androidx.compose.runtime.Composable
+private fun SessionSplash() {
+    Surface(
+        color = Color(0xFF120B33),
+        modifier = Modifier.fillMaxSize(),
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center,
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Image(
+                    painter = painterResource(tap.win.app.R.mipmap.ic_launcher),
+                    contentDescription = null,
+                    modifier = Modifier.size(72.dp),
+                )
+                Spacer(Modifier.height(16.dp))
+                CircularProgressIndicator(color = Color(0xFF6C4DF6), strokeWidth = 3.dp)
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    "جارٍ استعادة جلستك…",
+                    color = Color.White.copy(alpha = 0.8f),
+                    fontSize = 14.sp,
+                )
+            }
+        }
+    }
+}
+
 @androidx.compose.runtime.Composable
 private fun AppNav(session: SessionStore, activity: ComponentActivity) {
     var auth by remember { mutableStateOf<AuthResponse?>(null) }
     var checked by remember { mutableStateOf(false) }
+    var restoring by remember { mutableStateOf(session.refreshToken != null) }
     var mode by remember { mutableStateOf<AuthMode>(AuthMode.Login) }
     val scope = rememberCoroutineScope()
 
@@ -107,16 +157,21 @@ private fun AppNav(session: SessionStore, activity: ComponentActivity) {
                         session.clear()
                     }
                 } else {
-                    // Refresh failed (expired/revoked) -> start clean at the login screen.
-                    session.clear()
+                    // Network hiccup: keep the stored refresh token so the NEXT launch
+                    // can still restore the session directly instead of bouncing the
+                    // user through the login screen. Only clear on an explicit auth
+                    // rejection (401/403 = expired/revoked refresh token).
+                    val code = res?.code()
+                    if (code == 401 || code == 403) session.clear()
                 }
+                restoring = false
             }
         }
     }
 
     val current = auth
-    if (current != null) {
-        HomeScreen(
+    when {
+        current != null -> HomeScreen(
             session = session,
             user = current.user,
             onLogout = {
@@ -125,8 +180,10 @@ private fun AppNav(session: SessionStore, activity: ComponentActivity) {
                 mode = AuthMode.Login
             },
         )
-    } else {
-        AuthScreen(
+        // A saved session exists and is being validated: show a neutral splash
+        // instead of flashing the login screen first.
+        restoring -> SessionSplash()
+        else -> AuthScreen(
             mode = mode,
             onModeChange = { mode = it },
             onAuthenticated = { resp ->

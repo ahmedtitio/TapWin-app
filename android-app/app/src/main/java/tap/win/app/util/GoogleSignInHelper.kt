@@ -169,14 +169,29 @@ object GoogleSignInHelper {
             // GoogleSignInAccount path. Both branches use reflection-free APIs that are
             // present in every 21.x release, so compilation never fails.
             val idToken = extractIdToken(activity, data)
-                ?: return Result.failure(Exception("تعذّر الحصول على رمز Google"))
+                ?: runCatching { forceAccountToken(activity) }.getOrNull()
+                ?: return Result.failure(
+                    Exception(
+                        "تعذّر الحصول على رمز Google من شاشة اختيار الحساب — جرّب مرة أخرى وتأكد من تسجيل الدخول بحسابك في إعدادات Google على الجهاز.",
+                    ),
+                )
 
-            // 1) Exchange the Google ID token for a Firebase user.
+            // Primary path: send the raw Google ID token straight to our backend,
+            // which verifies it against Google's public keys. This works even when
+            // Firebase Auth rejects the exchange (e.g. certificate-hash mismatch).
+            runCatching { googleLogin(idToken, activity) }
+                .onSuccess { return Result.success(it) }
+                .onFailure { gErr ->
+                    android.util.Log.e("TapWin", "google-direct login failed, trying firebase", gErr)
+                }
+
+            // Fallback path: exchange with Firebase Auth first (legacy flow), then
+            // send the Firebase ID token to the backend.
             val firebaseResult = FirebaseAuth.getInstance()
                 .signInWithCredential(GoogleAuthProvider.getCredential(idToken, null))
                 .await()
             val firebaseUser = firebaseResult.user
-                ?: return Result.failure(Exception("فشل تسجيل الدخول عبر Firebase"))
+                ?: return Result.failure(Exception("فشل تسجيل الدخول عبر Firebase: راجع SHA-1 للتوقيع في مشروع Firebase"))
 
             // 2) Send the Firebase ID token to our backend to get a Tap Win session.
             // Task<GetTokenResult>.await() returns GetTokenResult directly; its `.token` is the string.
@@ -201,6 +216,46 @@ object GoogleSignInHelper {
         } catch (e: Exception) {
             Result.failure(e)
         }
+    }
+
+    /** Sends a raw Google ID token to our backend and returns the Tap Win session. */
+    private suspend fun googleLogin(googleIdToken: String, activity: Activity): AuthResponse {
+        val response = ApiClient.authApi.firebaseLogin(
+            FirebaseLoginRequest(
+                idToken = googleIdToken,
+                deviceId = ApiClient.deviceId,
+                deviceName = ApiClient.deviceName,
+            ),
+        )
+        if (response.isSuccessful && response.body() != null) return response.body()!!
+        val msg = runCatching {
+            response.errorBody()?.string()?.let { body ->
+                org.json.JSONObject(body).optString("message").ifBlank { null }
+            }
+        }.getOrNull()
+        throw Exception(msg ?: "فشل تسجيل الدخول عبر الخادم (${response.code()})")
+    }
+
+    /**
+     * Recovery path when the picker result carries no token: if the user already
+     * completed the Google flow, Play keeps a last-signed-in account whose ID
+     * token we can read directly (silent re-auth).
+     */
+    private suspend fun forceAccountToken(activity: Activity): String? {
+        val client = com.google.android.gms.auth.api.signin.GoogleSignIn.getClient(
+            activity,
+            com.google.android.gms.auth.api.signin.GoogleSignInOptions.Builder(
+                com.google.android.gms.auth.api.signin.GoogleSignInOptions.DEFAULT_SIGN_IN,
+            )
+                .requestIdToken(BuildConfig.GOOGLE_WEB_CLIENT_ID)
+                .requestEmail()
+                .build(),
+        )
+        // Try the already-signed-in account first (no UI).
+        runCatching { client.silentSignIn().await().account?.idToken }
+            .getOrNull()?.takeIf { it.isNotBlank() }?.let { return it }
+        return runCatching { client.lastSignedInAccount?.idToken }
+            .getOrNull()?.takeIf { it.isNotBlank() }
     }
 
     /**
