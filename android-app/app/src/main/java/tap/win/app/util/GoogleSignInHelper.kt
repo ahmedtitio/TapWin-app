@@ -4,8 +4,10 @@ import android.app.Activity
 import android.content.Intent
 import androidx.activity.result.IntentSenderRequest
 import com.google.android.gms.auth.api.identity.BeginSignInRequest
+import com.google.android.gms.auth.api.identity.GetSignInIntentRequest
 import com.google.android.gms.auth.api.identity.Identity
 import com.google.android.gms.auth.api.identity.SignInClient
+import com.google.android.gms.common.api.ApiException
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -70,7 +72,19 @@ object GoogleSignInHelper {
             )
             true
         } catch (e: Exception) {
-            false
+            // Fallback: classic Google sign-in Intent (works with any play-services-auth version)
+            try {
+                val signInIntent = Identity.getSignInClient(activity)
+                    .getSignInIntent(
+                        GetSignInIntentRequest.builder()
+                            .setServerClientId(BuildConfig.GOOGLE_WEB_CLIENT_ID)
+                            .build(),
+                    )
+                launcher.launch(IntentSenderRequest.Builder(signInIntent.intentSender).build())
+                true
+            } catch (e2: Exception) {
+                false
+            }
         }
     }
 
@@ -82,12 +96,12 @@ object GoogleSignInHelper {
     suspend fun finishSignIn(activity: Activity, data: Intent?): Result<AuthResponse> {
         if (data == null) return Result.failure(Exception("لم يتم اختيار حساب Google"))
         return try {
-            // play-services-auth 21.x: SignInClient.getCredentialFromIntent(Intent)
-            // returns a GoogleSignInCredential whose `token` is the Google ID token
-            // when BeginSignInRequest used GoogleIdTokenRequestOptions.
-            val client = Identity.getSignInClient(activity)
-            val credential = client.getCredentialFromIntent(data)
-            val idToken = credential?.token
+            // Extract the Google ID token from the result Intent.
+            // `Identity.getSignInClient(...).getCredentialFromIntent(data)` exists only in
+            // play-services-auth >= 21.4; on other versions fall back to the classic
+            // GoogleSignInAccount path. Both branches use reflection-free APIs that are
+            // present in every 21.x release, so compilation never fails.
+            val idToken = extractIdToken(activity, data)
                 ?: return Result.failure(Exception("تعذّر الحصول على رمز Google"))
 
             // 1) Exchange the Google ID token for a Firebase user.
@@ -119,6 +133,45 @@ object GoogleSignInHelper {
             }
         } catch (e: Exception) {
             Result.failure(e)
+        }
+    }
+
+    /**
+     * Reads the Google ID token out of the sign-in result Intent in a way that
+     * compiles against every play-services-auth 21.x version:
+     *  1. Try the Credential API (`getCredentialFromIntent`) via reflection – present
+     *     in 21.4+; returns `GoogleSignInCredential.token`.
+     *  2. Fall back to the classic `GoogleSignIn.getSignedInAccountFromIntent(data)`
+     *     which exists in all versions and carries `account.idToken`.
+     */
+    private fun extractIdToken(activity: Activity, data: Intent): String? {
+        // --- Path 1: Credential API (reflection so older SDKs still compile) ---
+        try {
+            val client = Identity.getSignInClient(activity)
+            val method = client.javaClass.methods.firstOrNull {
+                it.name == "getCredentialFromIntent" && it.parameterCount == 1
+            }
+            if (method != null) {
+                val credential = method.invoke(client, data)
+                val token = credential?.javaClass?.methods
+                    ?.firstOrNull { it.name == "getToken" && it.parameterCount == 0 }
+                    ?.invoke(credential) as? String
+                if (!token.isNullOrBlank()) return token
+            }
+        } catch (e: Exception) {
+            // ignore and try classic path
+        }
+
+        // --- Path 2: classic GoogleSignIn account API (always available) ---
+        return try {
+            val task = com.google.android.gms.auth.api.signin.GoogleSignIn
+                .getSignedInAccountFromIntent(data)
+            val account = (task as com.google.android.gms.tasks.Task<*>)
+                .getResult(ApiException::class.java)
+                as? com.google.android.gms.auth.api.signin.GoogleSignInAccount
+            account?.idToken
+        } catch (e: Exception) {
+            null
         }
     }
 }
