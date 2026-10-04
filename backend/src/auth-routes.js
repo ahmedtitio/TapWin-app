@@ -117,7 +117,8 @@ async function consumeEmailCode(userId, purpose, code) {
 /* ------------------------------ REGISTER ------------------------------ */
 router.post('/register', async (req, res) => {
   try {
-    const { full_name, email, phone, password } = req.body || {};
+    const { email, phone, password } = req.body || {};
+    const full_name = req.body.full_name || req.body.name;
     // username is optional (web dashboard doesn't collect it) — derive from email local-part.
     const username = (req.body?.username || '').trim() || String(email || '').split('@')[0].replace(/[^a-z0-9._-]/gi, '') || `user_${Date.now().toString(36)}`;
     if (!full_name || !email || !password)
