@@ -251,16 +251,13 @@ object GoogleSignInHelper {
                 .requestEmail()
                 .build(),
         )
-        // 1) Already-signed-in account via silent re-auth (no UI).
-        //    GoogleSignInAccount.id is a CharSequence -> id must be requested explicitly.
+        // 1) Silent re-auth (no UI): the returned GoogleSignInAccount already
+        //    carries the ID token because requestIdToken(...) was set above.
+        //    NOTE: do NOT use client.getAccessToken(account) here - that overload
+        //    does not exist in play-services-auth 21.x and breaks compilation.
         val silent = runCatching { client.silentSignIn().await() }.getOrNull()
-        val silentAcc = silent?.account
-        if (silentAcc != null) {
-            val tok = runCatching {
-                client.getAccessToken(silentAcc).await()?.token
-            }.getOrNull()
-            if (!tok.isNullOrEmpty()) return tok
-        }
+        val silentTok = silent?.idToken
+        if (!silentTok.isNullOrEmpty()) return silentTok
         // 2) Last signed-in account stored by Play Services (no network call).
         val last = runCatching {
             com.google.android.gms.auth.api.signin.GoogleSignIn.getLastSignedInAccount(activity)
