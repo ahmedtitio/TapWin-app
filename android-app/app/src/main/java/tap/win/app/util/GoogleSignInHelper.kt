@@ -189,13 +189,49 @@ object GoogleSignInHelper {
         }
 
         // --- Path 2: classic GoogleSignIn account API (always available) ---
-        return try {
+        try {
             val task = com.google.android.gms.auth.api.signin.GoogleSignIn
                 .getSignedInAccountFromIntent(data)
             val account = (task as com.google.android.gms.tasks.Task<*>)
                 .getResult(ApiException::class.java)
                 as? com.google.android.gms.auth.api.signin.GoogleSignInAccount
-            account?.idToken
+            if (account != null) {
+                val t = account.idToken
+                    ?: runCatching {
+                        // Request the server auth code flow can also yield an id token here.
+                        account.getId()
+                    }.getOrNull()?.let { null }
+                if (!t.isNullOrBlank()) return t
+            }
+        } catch (e: Exception) {
+            // ignore and try raw intent extras
+        }
+
+        // --- Path 3: read the id_token directly from the result Intent extras ---
+        // The Credential/Identity result puts the Google ID token into the intent
+        // even when typed accessors are unavailable on the bundled SDK version.
+        return try {
+            val extras: android.os.Bundle? = data.extras
+            val candidates = listOf(
+                "accountResponseObject",           // BeginSignIn google id-token result key
+                "googleAccountID",
+                "id_token",
+            )
+            for (key in candidates) {
+                val v = extras?.get(key) ?: continue
+                val str = v.toString()
+                // A real JWT has three dot-separated base64 segments.
+                if (str.count { it == '.' } == 2 && str.startsWith("eyJ")) return str
+            }
+            // Nested bundle variant used by some play-services builds.
+            extras?.keySet()?.forEach { k ->
+                val nested = runCatching { extras.getBundle(k) }.getOrNull()
+                val tok = nested?.getString("data") ?: nested?.keySet()?.firstNotNullOfOrNull { kk ->
+                    nested.getString(kk)?.takeIf { it.startsWith("eyJ") && it.count { c -> c == '.' } == 2 }
+                }
+                if (tok != null) return tok
+            }
+            null
         } catch (e: Exception) {
             null
         }

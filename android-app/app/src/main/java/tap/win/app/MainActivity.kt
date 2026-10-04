@@ -66,10 +66,11 @@ private fun AppNav(session: SessionStore, activity: ComponentActivity) {
                 }.getOrNull()
                 if (res?.isSuccessful == true && res.body() != null) {
                     val body = res.body()!!
-                    session.save(body.tokens.accessToken, body.tokens.refreshToken, body.user.id)
+                    session.save(body.tokens.accessToken, body.tokens.refreshToken, body.user.id.toString())
                     auth = body
                     MyApp.startPresence(activity.application)
                 } else {
+                    // Refresh failed (expired/revoked) -> start clean at the login screen.
                     session.clear()
                 }
             }
@@ -92,7 +93,7 @@ private fun AppNav(session: SessionStore, activity: ComponentActivity) {
             mode = mode,
             onModeChange = { mode = it },
             onAuthenticated = { resp ->
-                session.save(resp.tokens.accessToken, resp.tokens.refreshToken, resp.user.id)
+                session.save(resp.tokens.accessToken, resp.tokens.refreshToken, resp.user.id.toString())
                 auth = resp
                 MyApp.startPresence(activity.application)
             },

@@ -55,6 +55,7 @@ async function buildApp(env) {
     ADMIN_PASSWORD: env.ADMIN_PASSWORD,
     APP_URL: env.APP_URL,
     FIREBASE_PROJECT_ID: env.FIREBASE_PROJECT_ID,
+    RESEND_API_KEY: env.RESEND_API_KEY,
     NODE_ENV: 'production',
   });
 

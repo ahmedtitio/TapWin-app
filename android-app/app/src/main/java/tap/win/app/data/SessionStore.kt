@@ -30,14 +30,14 @@ class SessionStore(context: Context) {
         get() = prefs.getString(KEY_REFRESH, null)
         set(value) { prefs.edit().putString(KEY_REFRESH, value).apply() }
 
-    var userId: Int
-        get() = prefs.getInt(KEY_USER_ID, -1)
-        set(value) { prefs.edit().putInt(KEY_USER_ID, value).apply() }
+    var userId: String?
+        get() = prefs.getString(KEY_USER_ID, null)
+        set(value) { prefs.edit().putString(KEY_USER_ID, value).apply() }
 
     val isLoggedIn: Boolean
         get() = accessToken != null && refreshToken != null
 
-    fun save(access: String, refresh: String, id: Int) {
+    fun save(access: String, refresh: String, id: String?) {
         accessToken = access
         refreshToken = refresh
         userId = id

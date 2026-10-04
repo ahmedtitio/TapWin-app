@@ -7,6 +7,7 @@ import {
   hashPassword, verifyPassword, signAccessToken, signRefreshToken,
   authRequired, sha256, clientIp,
 } from './auth.js';
+import * as jwt from './jwt-lite.js';
 
 const router = Router();
 
@@ -39,6 +40,80 @@ async function logLogin(userId, email, success, req) {
   ).catch(() => {});
 }
 
+/** Like authRequired but never rejects: sets req.user when a valid app JWT is present. */
+async function optionalAuth(req, res, next) {
+  try {
+    const h = req.headers['authorization'] || '';
+    const token = h.startsWith('Bearer ') ? h.slice(7) : null;
+    if (token) {
+      const payload = await jwt.verify(token, process.env.JWT_SECRET, { audience: 'app' });
+      req.user = { id: payload.sub, role: payload.role, email: payload.email };
+    }
+  } catch { /* anonymous */ }
+  next();
+}
+
+/* ------------------------- EMAIL CODE HELPERS -------------------------- */
+async function sendEmail({ to, subject, html }) {
+  const key = process.env.RESEND_API_KEY;
+  if (!key) { console.log('[mail] skipped (no RESEND_API_KEY):', subject, '->', to); return false; }
+  try {
+    const r = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}`, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        from: process.env.MAIL_FROM || 'Tap Win <onboarding@resend.dev>',
+        to: [to], subject, html,
+      }),
+    });
+    if (!r.ok) console.error('[mail] resend error', r.status, (await r.text()).slice(0, 200));
+    return r.ok;
+  } catch (e) { console.error('[mail] failed', String(e?.message || e)); return false; }
+}
+
+function sixDigits() {
+  let c = '';
+  for (let i = 0; i < 6; i++) c += Math.floor(Math.random() * 10);
+  return c;
+}
+
+async function issueEmailCode(userId, purpose, email, name, kind) {
+  const code = sixDigits();
+  await query(
+    `INSERT INTO email_codes (user_id, purpose, code_hash, expires_at)
+     VALUES ($1,$2,$3, now() + interval '${kind === 'reset' ? '15 minutes' : '24 hours'}')`,
+    [userId, purpose, sha256(code)],
+  );
+  const title = kind === 'reset' ? 'رمز استعادة كلمة السر' : 'رمز التحقق من البريد الإلكتروني';
+  const intro = kind === 'reset'
+    ? 'طلب أحد (ربما أنت) إعادة تعيين كلمة سر حساب Tap Win. استخدم الرمز التالي لتعيين كلمة سر جديدة:'
+    : `مرحبًا ${name || ''}! أكمل تفعيل حسابك في Tap Win باستخدام الرمز التالي:`;
+  await sendEmail({
+    to: email,
+    subject: `${title} — Tap Win`,
+    html: `<div style="font-family:Arial,sans-serif;background:#120B33;color:#fff;padding:32px;border-radius:12px">
+      <h2 style="color:#6C4DF6">Tap Win</h2>
+      <p>${intro}</p>
+      <p style="font-size:34px;letter-spacing:10px;font-weight:bold;color:#00D4AA;background:#1D1445;display:inline-block;padding:12px 24px;border-radius:10px">${code}</p>
+      <p style="color:#aaa">${kind === 'reset' ? 'الرمز صالح 15 دقيقة.' : 'الرمز صالح 24 ساعة.'} إذا لم تطلب هذا الإجراء تجاهل الرسالة.</p>
+    </div>`,
+  });
+  // Dev convenience: no mail provider configured -> surface the code so clients can proceed.
+  return process.env.RESEND_API_KEY ? null : code;
+}
+
+async function consumeEmailCode(userId, purpose, code) {
+  const { rows } = await query(
+    `SELECT id FROM email_codes
+     WHERE user_id=$1 AND purpose=$2 AND code_hash=$3 AND used_at IS NULL AND expires_at > now()
+     ORDER BY id DESC LIMIT 1`,
+    [userId, purpose, sha256(String(code || '').trim())],
+  );
+  if (!rows.length) return false;
+  await query('UPDATE email_codes SET used_at=now() WHERE id=$1', [rows[0].id]);
+  return true;
+}
+
 /* ------------------------------ REGISTER ------------------------------ */
 router.post('/register', async (req, res) => {
   try {
@@ -58,8 +133,8 @@ router.post('/register', async (req, res) => {
 
     const hash = await hashPassword(password);
     const { rows } = await query(
-      `INSERT INTO users (id, full_name, username, email, phone, password_hash)
-       VALUES ($6,$1,$2,$3,$4,$5) RETURNING id, full_name, username, email, role, created_at`,
+      `INSERT INTO users (id, full_name, username, email, phone, password_hash, email_verified)
+       VALUES ($6,$1,$2,$3,$4,$5,false) RETURNING id, full_name, username, email, role, created_at, email_verified`,
       [full_name.trim(), username.toLowerCase(), email.toLowerCase(), phone || null, hash, newId()],
     );
     const user = rows[0];
@@ -79,7 +154,14 @@ router.post('/register', async (req, res) => {
     const refreshToken = signRefreshToken();
     await storeRefreshToken(user.id, refreshToken, device_id);
 
-    res.status(201).json({ user, tokens: { accessToken, refreshToken } });
+    // Email verification is mandatory before entering the dashboard.
+    const devCode = await issueEmailCode(user.id, 'verify_email', user.email, user.full_name, 'verify');
+    res.status(201).json({
+      user,
+      tokens: { accessToken, refreshToken },
+      message: 'تم إنشاء الحساب! أدخل رمز التحقق المرسل إلى بريدك الإلكتروني لتفعيل الحساب.',
+      ...(devCode ? { dev_code: devCode } : {}),
+    });
   } catch (e) {
     console.error('[register] error:', String(e?.stack || e).slice(0, 1000));
     res.status(500).json({ error: 'SERVER_ERROR', message: 'حدث خطأ في الخادم', detail: String(e?.message || e).slice(0, 200) });
@@ -117,6 +199,10 @@ router.post('/login', async (req, res) => {
       await logLogin(user.id, email, false, req);
       return res.status(403).json({ error: 'ACCOUNT_DISABLED', message: 'تم تعطيل هذا الحساب' });
     }
+    if (aud === 'app' && user.role !== 'admin' && user.email_verified === false) {
+      await logLogin(user.id, email, false, req);
+      return res.status(403).json({ error: 'EMAIL_NOT_VERIFIED', message: 'لم يتم تأكيد بريدك الإلكتروني بعد. افتح التطبيق وأدخل رمز التحقق، أو استخدم "نسيت كلمة السر" لإعادة الإرسال.' });
+    }
 
     await query('UPDATE users SET last_login_at=now(), failed_attempts=0, locked_until=NULL WHERE id=$1', [user.id]);
 
@@ -132,6 +218,7 @@ router.post('/login', async (req, res) => {
     const publicUser = {
       id: user.id, full_name: user.full_name, username: user.username, email: user.email,
       phone: user.phone, role: user.role, avatar_url: user.avatar_url, last_login_at: user.last_login_at,
+      email_verified: user.email_verified !== false,
     };
     const accessToken = await signAccessToken(publicUser, aud);
     const refreshToken = signRefreshToken();
@@ -310,8 +397,8 @@ router.post('/firebase', async (req, res) => {
       const randomHash = await hashPassword(randomBytesHex(24));
       ({ rows } = await query(
         `INSERT INTO users (id, full_name, username, email, phone, password_hash, avatar_url, firebase_uid)
-         VALUES ($8,$1,$2,$3,NULL,$5,$6,$7)
-         RETURNING id, full_name, username, email, phone, role, avatar_url, last_login_at`,
+         VALUES ($8,$1,$2,$3,NULL,$5,$6,$7,true)
+         RETURNING id, full_name, username, email, phone, role, avatar_url, last_login_at, email_verified`,
         [name, username, email, null, randomHash, fp.picture || null, fp.user_id, newId()],
       ));
       user = rows[0];
@@ -337,6 +424,7 @@ router.post('/firebase', async (req, res) => {
     const publicUser = {
       id: user.id, full_name: user.full_name, username: user.username, email: user.email,
       phone: user.phone, role: user.role, avatar_url: user.avatar_url, last_login_at: user.last_login_at,
+      email_verified: user.email_verified !== false,
     };
     const accessToken = await signAccessToken(publicUser, 'app');
     const refreshToken = signRefreshToken();
@@ -376,29 +464,18 @@ router.post('/forgot-password', async (req, res) => {
   try {
     const { email } = req.body || {};
     // Always answer 200 to avoid account enumeration.
-    const generic = { message: 'إذا كان البريد مسجّلًا لدينا فقد أُرسلت إليه رابط إعادة التعيين' };
+    const generic = { message: 'إذا كان البريد مسجّلًا لدينا فقد أُرسلت إليه رسالة تحتوي رمز تحقق' };
     if (!email || !EMAIL_RE.test(email)) return res.json(generic);
 
-    const { rows } = await query('SELECT id FROM users WHERE email=$1', [email.toLowerCase()]);
+    const { rows } = await query('SELECT id, full_name FROM users WHERE email=$1', [email.toLowerCase()]);
     if (!rows.length) return res.json(generic);
 
-    const token = randomBytesHex(32);
-    await query(
-      `INSERT INTO password_resets (user_id, token_hash, expires_at) VALUES ($1,$2, now() + interval '1 hour')`,
-      [rows[0].id, sha256(token)],
-    );
-    const link = `${process.env.APP_URL || 'http://localhost:5173'}/reset-password?token=${token}`;
-    console.log(`[auth] password reset link for ${email}: ${link}`);
-    // TODO production: send this link through Cloudflare Email Sending / Resend / SendGrid.
-
-    // In development (no SMTP configured) return the raw link so clients can use it directly.
-    if (!process.env.SMTP_READY && process.env.NODE_ENV !== 'production') {
-      return res.json({ ...generic, reset_url: link });
-    }
-    res.json(generic);
+    const devCode = await issueEmailCode(rows[0].id, 'reset_password', email.toLowerCase(), rows[0].full_name, 'reset');
+    console.log(`[auth] password reset code issued for ${email}`);
+    res.json({ ...generic, ...(devCode ? { dev_code: devCode } : {}) });
   } catch (e) {
     console.error(e);
-    res.status(500).json({ error: 'SERVER_ERROR' });
+    res.status(500).json({ error: 'SERVER_ERROR', message: 'حدث خطأ في الخادم' });
   }
 });
 
@@ -410,21 +487,77 @@ router.post('/reset-password', async (req, res) => {
     const bad = pwIssue(password);
     if (bad) return res.status(400).json({ error: 'VALIDATION', message: bad });
 
-    const { rows } = await query(
-      `SELECT pr.user_id FROM password_resets pr
-       WHERE pr.token_hash=$1 AND pr.expires_at > now() AND pr.used_at IS NULL`,
-      [sha256(token)],
-    );
-    if (!rows.length) return res.status(400).json({ error: 'INVALID_TOKEN', message: 'الرابط غير صالح أو منتهي الصلاحية' });
+    let userId = null;
+    const isSixDigit = /^\d{6}$/.test(String(token).trim());
+    if (isSixDigit) {
+      // Find the user that owns this active reset code.
+      const { rows } = await query(
+        `SELECT ec.user_id FROM email_codes ec
+         WHERE ec.purpose='reset_password' AND ec.code_hash=$1 AND ec.used_at IS NULL AND ec.expires_at > now()
+         ORDER BY ec.id DESC LIMIT 1`,
+        [sha256(String(token).trim())],
+      );
+      if (!rows.length) return res.status(400).json({ error: 'INVALID_CODE', message: 'رمز التحقق غير صالح أو منتهي الصلاحية' });
+      userId = rows[0].user_id;
+      await query(`UPDATE email_codes SET used_at=now() WHERE user_id=$1 AND purpose='reset_password' AND used_at IS NULL`, [userId]);
+    } else {
+      const { rows } = await query(
+        `SELECT pr.user_id FROM password_resets pr
+         WHERE pr.token_hash=$1 AND pr.expires_at > now() AND pr.used_at IS NULL`,
+        [sha256(token)],
+      );
+      if (!rows.length) return res.status(400).json({ error: 'INVALID_TOKEN', message: 'الرابط غير صالح أو منتهي الصلاحية' });
+      userId = rows[0].user_id;
+      await query('UPDATE password_resets SET used_at=now() WHERE token_hash=$1', [sha256(token)]);
+    }
 
     const hash = await hashPassword(password);
-    await query('UPDATE users SET password_hash=$2, updated_at=now(), failed_attempts=0, locked_until=NULL WHERE id=$1', [rows[0].user_id, hash]);
-    await query('UPDATE password_resets SET used_at=now() WHERE token_hash=$1', [sha256(token)]);
-    await query('UPDATE refresh_tokens SET revoked_at=now() WHERE user_id=$1 AND revoked_at IS NULL', [rows[0].user_id]);
+    await query('UPDATE users SET password_hash=$2, updated_at=now(), failed_attempts=0, locked_until=NULL WHERE id=$1', [userId, hash]);
+    await query('UPDATE refresh_tokens SET revoked_at=now() WHERE user_id=$1 AND revoked_at IS NULL', [userId]);
 
     res.json({ message: 'تم تعيين كلمة سر جديدة بنجاح' });
   } catch (e) {
     console.error(e);
+    res.status(500).json({ error: 'SERVER_ERROR' });
+  }
+});
+
+/* ------------------------- EMAIL VERIFICATION -------------------------- */
+// New app accounts must confirm the 6-digit code emailed at registration.
+router.post('/verify-email', [optionalAuth], async (req, res) => {
+  try {
+    const { access_token, code } = req.body || {};
+    if (!code) return res.status(400).json({ error: 'VALIDATION', message: 'أدخل رمز التحقق' });
+    let uid = req.user?.id;
+    if (!uid && access_token) {
+      try {
+        const payload = await jwt.verify(access_token, process.env.JWT_SECRET, { audience: 'app' });
+        uid = payload.sub;
+      } catch { /* fall through */ }
+    }
+    if (!uid) return res.status(401).json({ error: 'UNAUTHORIZED', message: 'انتهت صلاحية الجلسة، سجّل الدخول من جديد' });
+
+    const ok = await consumeEmailCode(uid, 'verify_email', code);
+    if (!ok) return res.status(400).json({ error: 'INVALID_CODE', message: 'رمز التحقق غير صحيح أو منتهي الصلاحية' });
+
+    await query('UPDATE users SET email_verified=true, updated_at=now() WHERE id=$1', [uid]);
+    res.json({ message: 'تم تفعيل الحساب بنجاح' });
+  } catch (e) {
+    console.error('[verify-email]', String(e?.message || e));
+    res.status(500).json({ error: 'SERVER_ERROR' });
+  }
+});
+
+router.post('/resend-verification', [authRequired('app')], async (req, res) => {
+  try {
+    const { rows } = await query('SELECT email, full_name, email_verified FROM users WHERE id=$1', [req.user.id]);
+    const u = rows[0];
+    if (!u) return res.status(404).json({ error: 'NOT_FOUND' });
+    if (u.email_verified) return res.json({ message: 'الحساب مفعّل بالفعل' });
+    const devCode = await issueEmailCode(u.id, 'verify_email', u.email, u.full_name, 'verify');
+    res.json({ message: 'تم إرسال رمز تحقق جديد إلى بريدك الإلكتروني', ...(devCode ? { dev_code: devCode } : {}) });
+  } catch (e) {
+    console.error('[resend-verification]', String(e?.message || e));
     res.status(500).json({ error: 'SERVER_ERROR' });
   }
 });

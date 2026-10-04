@@ -1,21 +1,8 @@
-# Dependencies
 node_modules/
-
-# Build artifacts and cache
-.wrangler/
 dist/
-build/
-
-# Environment and secrets
-.env
-.dev.vars
-*.jks
-*.keystore
-
-# OS files
-.DS_Store
-# Codemagic build outputs
-build/
-*.aab
-CM_KEYSTORE_BASE64.txt
+.wrangler/
 .gradle/
+build/
+*.log
+.env.local
+backend/.dev.vars

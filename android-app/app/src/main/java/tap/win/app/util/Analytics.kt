@@ -50,7 +50,7 @@ object Analytics {
     fun screenView(screenName: String) = logEvent("screen_view", mapOf("screen_name" to screenName))
     fun login(method: String) = logEvent("login", mapOf("method" to method))
     fun register() = logEvent("sign_up", mapOf("method" to "form"))
+    fun verifyEmail() = logEvent("verify_email")
     fun logout() = logEvent("logout")
     fun profileUpdated() = logEvent("profile_updated")
     fun passwordResetRequested() = logEvent("forgot_password")
-}

@@ -12,6 +12,7 @@ data class User(
     val role: String,
     @SerializedName("avatar_url") val avatarUrl: String?,
     @SerializedName("last_login_at") val lastLoginAt: String?,
+    @SerializedName("email_verified") val emailVerified: Boolean = true,
 )
 
 data class Tokens(
@@ -48,7 +49,14 @@ data class ForgotRequest(val email: String)
 
 data class ResetRequest(
     val token: String,
-    @SerializedName("new_password") val newPassword: String,
+    val password: String,
+)
+
+data class ForgotResponse(val message: String?, val code: String?)
+
+data class VerifyEmailRequest(
+    @SerializedName("access_token") val accessToken: String,
+    val code: String,
 )
 
 data class RefreshRequest(@SerializedName("refresh_token") val refreshToken: String)
@@ -89,10 +97,16 @@ interface AuthApi {
     suspend fun login(@Body body: LoginRequest): retrofit2.Response<AuthResponse>
 
     @POST("api/auth/forgot-password")
-    suspend fun forgotPassword(@Body body: ForgotRequest): retrofit2.Response<Unit>
+    suspend fun forgotPassword(@Body body: ForgotRequest): retrofit2.Response<ForgotResponse>
 
     @POST("api/auth/reset-password")
     suspend fun resetPassword(@Body body: ResetRequest): retrofit2.Response<Unit>
+
+    @POST("api/auth/verify-email")
+    suspend fun verifyEmail(@Body body: VerifyEmailRequest): retrofit2.Response<Unit>
+
+    @POST("api/auth/resend-verification")
+    suspend fun resendVerification(@Header("Authorization") auth: String): retrofit2.Response<Unit>
 
     @POST("api/auth/refresh")
     suspend fun refresh(@Body body: RefreshRequest): retrofit2.Response<AuthResponse>

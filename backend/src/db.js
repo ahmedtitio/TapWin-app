@@ -96,6 +96,22 @@ export async function migrateWithSql(executor, bcryptLib, env = process.env) {
     CREATE INDEX IF NOT EXISTS idx_devices_user ON devices(user_id)
   `);
 
+  // Email verification codes for app registration.
+  await pool.query(`
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified boolean NOT NULL DEFAULT false
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS email_codes (
+      id          bigserial PRIMARY KEY,
+      user_id     uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      purpose     text NOT NULL,              -- verify_email | reset_password
+      code_hash   text NOT NULL,
+      expires_at  timestamptz NOT NULL,
+      used_at     timestamptz,
+      created_at  timestamptz NOT NULL DEFAULT now()
+    )
+  `);
+
   // Firebase Google sign-in linkage (one firebase uid per user, one email per uid).
   await pool.query(`
     ALTER TABLE users ADD COLUMN IF NOT EXISTS firebase_uid text UNIQUE

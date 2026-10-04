@@ -160,7 +160,7 @@ fun errorMessage(raw: Response<*>): String {
     }.getOrDefault("تعذر الاتصال بالخادم")
 }
 
-sealed class AuthMode { object Login : AuthMode(); object Register : AuthMode(); object Forgot : AuthMode() }
+sealed class AuthMode { object Login : AuthMode(); object Register : AuthMode(); object Forgot : AuthMode(); object Verify : AuthMode() }
 
 @Composable
 fun AuthScreen(
@@ -201,6 +201,7 @@ fun AuthScreen(
                     AuthMode.Login -> "سجّل الدخول للمتابعة"
                     AuthMode.Register -> "أنشئ حسابًا جديدًا"
                     AuthMode.Forgot -> "استعادة كلمة السر"
+                    AuthMode.Verify -> "تأكيد البريد الإلكتروني"
                 },
                 color = Color.White.copy(alpha = 0.6f),
             )
@@ -210,6 +211,7 @@ fun AuthScreen(
                 AuthMode.Login -> LoginForm(onModeChange, onAuthed)
                 AuthMode.Register -> RegisterForm(onModeChange, onAuthed)
                 AuthMode.Forgot -> ForgotForm(onModeChange)
+                AuthMode.Verify -> VerifyForm(onModeChange, onAuthed)
             }
         }
     }
@@ -255,6 +257,9 @@ private fun LoginForm(onModeChange: (AuthMode) -> Unit, onAuthenticated: (AuthRe
     }
 }
 
+/** Holds the freshly-created account's session until email verification passes. */
+private var pendingVerify: AuthResponse? = null
+
 @Composable
 private fun RegisterForm(onModeChange: (AuthMode) -> Unit, onAuthenticated: (AuthResponse) -> Unit) {
     var name by remember { mutableStateOf("") }
@@ -295,7 +300,9 @@ private fun RegisterForm(onModeChange: (AuthMode) -> Unit, onAuthenticated: (Aut
                 loading = false
                 if (res.isSuccessful && res.body() != null) {
                     Analytics.register()
-                    onAuthenticated(res.body()!!)
+                    // New accounts must confirm the emailed code before entering the dashboard.
+                    pendingVerify = res.body()!!
+                    onModeChange(AuthMode.Verify)
                 } else error = errorMessage(res)
             }
             } else error = "كلمتا السر غير متطابقتين"
@@ -312,10 +319,11 @@ private fun RegisterForm(onModeChange: (AuthMode) -> Unit, onAuthenticated: (Aut
 
 @Composable
 private fun ForgotForm(onModeChange: (AuthMode) -> Unit) {
-    var step by remember { mutableStateOf(0) } // 0: request code, 1: reset
+    var step by remember { mutableStateOf(0) } // 0: request code, 1: enter code + new password
     var email by remember { mutableStateOf("") }
     var code by remember { mutableStateOf("") }
     var newPass by remember { mutableStateOf("") }
+    var confirm by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     var info by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(false) }
@@ -331,22 +339,27 @@ private fun ForgotForm(onModeChange: (AuthMode) -> Unit) {
         if (step == 0) {
             AuthTextField(email, { email = it }, "البريد الإلكتروني", Icons.Filled.MailOutline,
                 keyboardType = androidx.compose.ui.text.input.KeyboardType.Email)
-            GradientButton(text = "إرسال رمز الاستعادة", loading = loading, onClick = {
+            GradientButton(text = "إرسال رمز التحقق", loading = loading, onClick = {
                 loading = true; error = null; info = null
                 kotlinx.coroutines.MainScope().launch {
                     val res = ApiClient.authApi.forgotPassword(ForgotRequest(email.trim()))
                     loading = false
-                    if (res.isSuccessful) {
+                    if (res.isSuccessful && res.body() != null) {
                         Analytics.passwordResetRequested()
                         step = 1
-                        info = "إذا كان البريد مسجلاً لدينا فستصلك رسالة تحتوي رمز الاستعادة."
+                        info = res.body()!!.message
+                            ?: "أرسلنا رمز تحقق مكونًا من 6 أرقام إلى بريدك الإلكتروني، صالح لمدة 15 دقيقة."
                     } else error = errorMessage(res)
                 }
             })
         } else {
-            AuthTextField(code, { code = it }, "رمز الاستعادة", Icons.Filled.Lock)
+            AuthTextField(code, { code = it }, "رمز التحقق (6 أرقام)", Icons.Filled.Lock,
+                keyboardType = androidx.compose.ui.text.input.KeyboardType.NumberPassword)
             AuthTextField(newPass, { newPass = it }, "كلمة السر الجديدة", Icons.Filled.Lock, isPassword = true)
+            AuthTextField(confirm, { confirm = it }, "تأكيد كلمة السر", Icons.Filled.Lock, isPassword = true)
             GradientButton(text = "تعيين كلمة السر", loading = loading, onClick = {
+                if (code.isBlank()) { error = "أدخل رمز التحقق الذي وصلك بالبريد"; return@GradientButton }
+                if (newPass != confirm) { error = "كلمتا السر غير متطابقتين"; return@GradientButton }
                 loading = true; error = null
                 kotlinx.coroutines.MainScope().launch {
                     val res = ApiClient.authApi.resetPassword(ResetRequest(code.trim(), newPass))
@@ -354,11 +367,67 @@ private fun ForgotForm(onModeChange: (AuthMode) -> Unit) {
                     if (res.isSuccessful) {
                         info = "تم تغيير كلمة السر بنجاح، يمكنك تسجيل الدخول الآن."
                         step = 0
+                        code = ""; newPass = ""; confirm = ""
                     } else error = errorMessage(res)
                 }
             })
+            TextButton(onClick = { step = 0; info = null; error = null }) {
+                Text("إعادة إرسال الرمز / تغيير البريد", color = Accent)
+            }
         }
         TextButton(onClick = { onModeChange(AuthMode.Login) }) {
+            Text("العودة لتسجيل الدخول", color = Accent)
+        }
+    }
+}
+
+@Composable
+private fun VerifyForm(onModeChange: (AuthMode) -> Unit, onAuthenticated: (AuthResponse) -> Unit) {
+    val pending = pendingVerify
+    if (pending == null) { onModeChange(AuthMode.Register); return }
+    var code by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf<String?>(null) }
+    var info by remember { mutableStateOf<String?>(null) }
+    var loading by remember { mutableStateOf(false) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        error?.let { ErrorMessage(it) }
+        info?.let {
+            Surface(color = Accent.copy(alpha = 0.12f), shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth()) {
+                Text(it, color = Accent, modifier = Modifier.padding(14.dp), textAlign = TextAlign.Start)
+            }
+        }
+        Text("أرسلنا رمز تحقق إلى ${'$'}{pending.user.email}", color = Color.White.copy(alpha = 0.75f))
+        AuthTextField(code, { code = it }, "رمز التحقق (6 أرقام)", Icons.Filled.Lock,
+            keyboardType = androidx.compose.ui.text.input.KeyboardType.NumberPassword)
+        GradientButton(text = "تأكيد الحساب والدخول", loading = loading, onClick = {
+            if (code.length != 6) { error = "أدخل الرمز المكون من 6 أرقام"; return@GradientButton }
+            loading = true; error = null
+            kotlinx.coroutines.MainScope().launch {
+                val res = ApiClient.authApi.verifyEmail(
+                    VerifyEmailRequest(pending.tokens.accessToken, code.trim()),
+                )
+                loading = false
+                if (res.isSuccessful) {
+                    pendingVerify = null
+                    Analytics.verifyEmail()
+                    onAuthenticated(pending)
+                } else error = errorMessage(res)
+            }
+        })
+        GradientButton(text = "إعادة إرسال الرمز", enabled = !loading, onClick = {
+            kotlinx.coroutines.MainScope().launch {
+                runCatching {
+                    ApiClient.authApi.resendVerification("Bearer ${'$'}{pending.tokens.accessToken}")
+                }
+                info = "تم إرسال رمز جديد إلى بريدك الإلكتروني."
+            }
+        })
+        TextButton(onClick = {
+            pendingVerify = null
+            onModeChange(AuthMode.Login)
+        }) {
             Text("العودة لتسجيل الدخول", color = Accent)
         }
     }
