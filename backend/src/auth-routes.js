@@ -393,8 +393,12 @@ async function verifyGoogleIdToken(idToken) {
   const p = decode(segs[1]);
 
   if (h.alg !== 'RS256' || !h.kid) throw new Error('BAD_TOKEN_FORMAT');
+  // Accept both the Web client id and the Android client id as audience:
+  // Credential-API tokens are aud=Web client; classic GoogleSignIn tokens
+  // are aud=Android client. Both are ours (project tapwin-app).
+  const allowedAud = new Set([GOOGLE_ANDROID_CLIENT_ID, process.env.GOOGLE_ANDROID_CLIENT_ID].filter(Boolean));
   const audOk = Array.isArray(p.aud) ? p.aud : [p.aud];
-  if (!audOk.some((a) => String(a) === GOOGLE_ANDROID_CLIENT_ID)) throw new Error('BAD_AUDIENCE');
+  if (!audOk.some((a) => allowedAud.has(String(a)))) throw new Error('BAD_AUDIENCE');
   if (!p.exp || p.exp * 1000 < Date.now()) throw new Error('TOKEN_EXPIRED');
   if (!p.email) throw new Error('NO_EMAIL');
 

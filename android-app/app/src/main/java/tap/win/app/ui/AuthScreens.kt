@@ -625,7 +625,6 @@ fun GoogleSignInButton(
             contentColor = Color(0xFF1F1F1F),
         ),
         border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.85f)),
-        elevation = ButtonDefaults.outlinedButtonElevation(defaultElevation = 2.dp),
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 52.dp)
