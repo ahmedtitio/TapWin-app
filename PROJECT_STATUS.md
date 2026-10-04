@@ -29,7 +29,8 @@
 
 | Commit | التاريخ | الوصف |
 |---|---|---|
-| `e0f29ac` (HEAD على GitHub ✅) | 2026-10-04 | Codemagic: نسخ الـ keystore إلى مجلد clone + حل مسار التوقيع بين الخطوات؛ Android: عرض dev_code في شاشة Verify؛ تحديث هذا الملف |
+| `a0be0b8` (HEAD على GitHub ✅) | 2026-10-04 | نشر user-dashboard على Pages + إعادة نشر Worker + اختبار E2E للتحقق على الإنتاج |
+| `e0f29ac` | 2026-10-04 | Codemagic: نسخ الـ keystore إلى مجلد clone + حل مسار التوقيع بين الخطوات؛ Android: عرض dev_code في شاشة Verify؛ تحديث هذا الملف |
 | `fa7eb2a` | 2026-10-04 | User web dashboard: OTP verification step on login for unverified accounts |
 | `cd87c64` | 2026-10-04 | ملف PROJECT_STATUS.md + إصلاحات auth المعلّقة (SessionStore userId String، شاشة Verify، OTP forgot/reset) |
 | `decf865` | 2026-10-04 | Backend: قبول `name` كمرادف لـ `full_name` في register (إصلاح VALIDATION crash) + إصلاح استيراد Analytics |
