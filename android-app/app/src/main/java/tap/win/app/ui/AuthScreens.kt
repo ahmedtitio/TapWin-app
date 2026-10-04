@@ -2,6 +2,8 @@ package tap.win.app.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -32,7 +34,6 @@ import tap.win.app.api.ResetRequest
 import tap.win.app.notifications.TapWinMessagingService
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.ui.platform.LocalContext
 import android.app.Activity
 import android.content.ContextWrapper
 import androidx.compose.runtime.rememberCoroutineScope

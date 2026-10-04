@@ -7,7 +7,12 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
+import kotlinx.coroutines.launch
 import tap.win.app.api.ApiClient
 import tap.win.app.api.AuthResponse
 import tap.win.app.data.SessionStore
@@ -45,15 +50,9 @@ class MainActivity : ComponentActivity() {
 
 @androidx.compose.runtime.Composable
 private fun AppNav(session: SessionStore, activity: ComponentActivity) {
-    var auth by androidx.compose.runtime.remember {
-        androidx.compose.runtime.mutableStateOf<AuthResponse?>(null)
-    }
-    var checked by androidx.compose.runtime.remember {
-        androidx.compose.runtime.mutableStateOf(false)
-    }
-    var mode by androidx.compose.runtime.remember {
-        androidx.compose.runtime.mutableStateOf<AuthMode>(AuthMode.Login)
-    }
+    var auth by remember { mutableStateOf<AuthResponse?>(null) }
+    var checked by remember { mutableStateOf(false) }
+    var mode by remember { mutableStateOf<AuthMode>(AuthMode.Login) }
     val scope = remember { MainScope() }
 
     // Restore session on cold start via refresh token

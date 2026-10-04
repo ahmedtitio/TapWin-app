@@ -6,6 +6,7 @@ import androidx.activity.result.IntentSenderRequest
 import com.google.android.gms.auth.api.identity.BeginSignInRequest
 import com.google.android.gms.auth.api.identity.Identity
 import com.google.android.gms.auth.api.identity.SignInClient
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -83,7 +84,7 @@ object GoogleSignInHelper {
         if (data == null) return Result.failure(Exception("لم يتم اختيار حساب Google"))
         return try {
             @Suppress("DEPRECATION")
-            val googleAccount = Identity.getSignInClient(activity).getSignInAccountFromIntent(data)
+            val googleAccount = GoogleSignInAccount.getFromIntent(data)
             val idToken = googleAccount?.id
                 ?: return Result.failure(Exception("تعذّر الحصول على رمز Google"))
 
