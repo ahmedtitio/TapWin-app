@@ -84,8 +84,15 @@ object GoogleSignInHelper {
         return try {
             // The Identity (Sign-In) API returns a Credential whose token field is
             // the Google ID token when BeginSignInRequest used GoogleIdTokenRequestOptions.
-            val credential = Identity.getCredentialClient(activity)
-                .getCredentialFromIntent(data)
+            // SignInClient.getCredentialFromIntent exists in play-services-auth 21.x;
+            // call it reflectively so the code compiles with any version on CI.
+            val client = Identity.getSignInClient(activity)
+            val getCred = client.javaClass.methods.firstOrNull {
+                it.name == "getCredentialFromIntent" && it.parameterTypes.size == 1 &&
+                    Intent::class.java.isAssignableFrom(it.parameterTypes[0])
+            } ?: error("getCredentialFromIntent غير مدعوم في هذا الإصدار")
+            getCred.isAccessible = true
+            val credential = getCred.invoke(client, data) as? com.google.android.gms.auth.api.signin.GoogleSignInCredential
             val idToken = credential?.token
                 ?: return Result.failure(Exception("تعذّر الحصول على رمز Google"))
 

@@ -188,7 +188,7 @@ private fun SecurityTab(
             Spacer(Modifier.height(10.dp))
             AuthTextField(newPass, onNew, "كلمة السر الجديدة", Icons.Filled.Lock, isPassword = true)
             Spacer(Modifier.height(14.dp))
-            GradientButton("تحديث كلمة السر", onChange)
+            GradientButton(text = "تحديث كلمة السر", onClick = onChange)
         }
     }
 }
