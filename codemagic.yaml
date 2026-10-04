@@ -66,7 +66,9 @@ workflows:
           [ -d "$APP_DIR" ] || { echo "ERROR: android-app directory not found"; exit 1; }
           cd "$APP_DIR"
           chmod +x gradlew
-          ./gradlew assembleRelease bundleRelease \
+          # Print ONLY the Kotlin compile errors (e:/w:) so they are visible in the last-50-lines log view
+          set +e
+          ./gradlew assembleRelease bundleRelease --console=plain \
             "-PAPI_BASE_URL=$API_BASE_URL" \
             "-PGA_MEASUREMENT_ID=$GA_MEASUREMENT_ID" \
             "-PGOOGLE_WEB_CLIENT_ID=$GOOGLE_WEB_CLIENT_ID" \
@@ -74,7 +76,15 @@ workflows:
             "-Pandroid.injected.signing.store.password=$CM_KEYSTORE_PASSWORD" \
             "-Pandroid.injected.signing.key.alias=$CM_KEY_ALIAS" \
             "-Pandroid.injected.signing.key.password=$CM_KEY_PASSWORD" \
-            --no-daemon --stacktrace
+            --no-daemon 2>&1 | tee /tmp/gradle_full.log
+          RC=${PIPESTATUS[0]}
+          set -e
+          if [ "$RC" -ne 0 ]; then
+            echo "=================== KOTLIN ERRORS (real cause) ==================="
+            grep -E "^e: |error: cannot find symbol" /tmp/gradle_full.log | head -60 || echo "(no e: lines found)"
+            echo "==================================================================="
+            exit "$RC"
+          fi
       - name: Stage artifacts
         script: |
           SRC="${APP_DIR:-$CM_CLONE_DIR/android-app}/app/build/outputs"

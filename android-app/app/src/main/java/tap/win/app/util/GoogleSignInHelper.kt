@@ -98,10 +98,11 @@ object GoogleSignInHelper {
                 ?: return Result.failure(Exception("فشل تسجيل الدخول عبر Firebase"))
 
             // 2) Send the Firebase ID token to our backend to get a Tap Win session.
-            val firebaseToken = firebaseUser.getIdToken(true).await()
+            // Task<GetTokenResult>.await() returns GetTokenResult directly; its `.token` is the string.
+            val tokenResult = firebaseUser.getIdToken(true).await()
             val response = ApiClient.authApi.firebaseLogin(
                 FirebaseLoginRequest(
-                    idToken = firebaseToken?.token ?: firebaseUser.uid,
+                    idToken = tokenResult?.token ?: firebaseUser.uid,
                     deviceId = ApiClient.deviceId,
                     deviceName = ApiClient.deviceName,
                 ),
