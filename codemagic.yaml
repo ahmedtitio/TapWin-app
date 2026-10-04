@@ -47,6 +47,8 @@ workflows:
           export CM_KEYSTORE="$KS"
           printf "%s" "$KS" > $CM_BUILD_DIR/keystore.b64
           tr -d ' \n\r\t' < $CM_BUILD_DIR/keystore.b64 | base64 --decode > $CM_BUILD_DIR/release.keystore
+          # Keep a copy in the clone dir so later steps can always find it
+          cp $CM_BUILD_DIR/release.keystore "$CM_CLONE_DIR/tapwin-release.keystore" 2>/dev/null || true
           if [ ! -s $CM_BUILD_DIR/release.keystore ]; then echo "ERROR: decoded keystore is empty"; exit 1; fi
           # sanity check: must be a valid JKS/PKCS12 keystore
           keytool -list -keystore $CM_BUILD_DIR/release.keystore -storepass "$CM_KEYSTORE_PASSWORD" >/dev/null 2>&1 \
@@ -66,13 +68,22 @@ workflows:
           [ -d "$APP_DIR" ] || { echo "ERROR: android-app directory not found"; exit 1; }
           cd "$APP_DIR"
           chmod +x gradlew
+          # Resolve the decoded keystore path (CM_BUILD_DIR may differ between steps)
+          KS_PATH="$CM_BUILD_DIR/release.keystore"
+          if [ ! -s "$KS_PATH" ] && [ -s "$CM_CLONE_DIR/tapwin-release.keystore" ]; then
+            KS_PATH="$CM_CLONE_DIR/tapwin-release.keystore"
+          fi
+          if [ ! -s "$KS_PATH" ]; then
+            echo "ERROR: release.keystore not found for signing"; exit 1;
+          fi
+          echo "Keystore path: $KS_PATH"
           # Print ONLY the Kotlin compile errors (e:/w:) so they are visible in the last-50-lines log view
           set +e
           ./gradlew assembleRelease bundleRelease --console=plain \
             "-PAPI_BASE_URL=$API_BASE_URL" \
             "-PGA_MEASUREMENT_ID=$GA_MEASUREMENT_ID" \
             "-PGOOGLE_WEB_CLIENT_ID=$GOOGLE_WEB_CLIENT_ID" \
-            "-Pandroid.injected.signing.store.file=$CM_BUILD_DIR/release.keystore" \
+            "-Pandroid.injected.signing.store.file=$KS_PATH" \
             "-Pandroid.injected.signing.store.password=$CM_KEYSTORE_PASSWORD" \
             "-Pandroid.injected.signing.key.alias=$CM_KEY_ALIAS" \
             "-Pandroid.injected.signing.key.password=$CM_KEY_PASSWORD" \

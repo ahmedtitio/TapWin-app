@@ -358,7 +358,14 @@ private fun LoginForm(onModeChange: (AuthMode) -> Unit, onAuthenticated: (AuthRe
                 loading = false
                 if (res.isSuccessful && res.body() != null) {
                     Analytics.login("password")
-                    onAuthenticated(res.body()!!)
+                    val body = res.body()!!
+                    // Unverified account -> route through the OTP screen first.
+                    if (!body.emailVerified) {
+                        pendingVerify = body
+                        onModeChange(AuthMode.Verify)
+                    } else {
+                        onAuthenticated(body)
+                    }
                 } else error = errorMessage(res)
             }
         })
@@ -514,6 +521,11 @@ private fun VerifyForm(onModeChange: (AuthMode) -> Unit, onAuthenticated: (AuthR
             }
         }
         Text("أرسلنا رمز تحقق إلى ${'$'}{pending.user.email}", color = Color.White.copy(alpha = 0.75f))
+        // When no email provider (RESEND_API_KEY) is configured, the backend returns the code
+        // directly for testing — surface it here so verification can be completed.
+        pending.dev_code?.let {
+            info = "وضع الاختبار: رمز التحقق الخاص بك هو $it"
+        }
         AuthTextField(code, { code = it }, "رمز التحقق (6 أرقام)", Icons.Filled.Lock,
             keyboardType = androidx.compose.ui.text.input.KeyboardType.NumberPassword)
         GradientButton(text = "تأكيد الحساب والدخول", loading = loading, onClick = {
