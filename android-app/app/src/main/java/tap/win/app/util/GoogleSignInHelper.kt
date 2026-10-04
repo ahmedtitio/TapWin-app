@@ -62,29 +62,53 @@ object GoogleSignInHelper {
                 .setAutoSelectEnabled(true)
                 .build()
 
-            val pendingResult = suspendCancellableCoroutine { cont ->
+            val pendingIntent = suspendCancellableCoroutine { cont ->
                 oneTapClient.beginSignIn(request)
-                    .addOnSuccessListener { result -> cont.resume(result) }
+                    .addOnSuccessListener { result -> cont.resume(result.pendingIntent) }
                     .addOnFailureListener { e -> cont.resumeWithException(e) }
             }
-            launcher.launch(
-                IntentSenderRequest.Builder(pendingResult.pendingIntent.intentSender).build(),
-            )
+            // PendingIntent has no compile-time `intentSender` accessor in every 21.x
+            // release, so read it via reflection – the field/method always exists at runtime.
+            val sender = extractIntentSender(pendingIntent)
+                ?: return launchClassicFallback(activity, launcher)
+            launcher.launch(IntentSenderRequest.Builder(sender).build())
             true
         } catch (e: Exception) {
             // Fallback: classic Google sign-in Intent (works with any play-services-auth version)
-            try {
-                val signInIntent = Identity.getSignInClient(activity)
-                    .getSignInIntent(
-                        GetSignInIntentRequest.builder()
-                            .setServerClientId(BuildConfig.GOOGLE_WEB_CLIENT_ID)
-                            .build(),
-                    )
-                launcher.launch(IntentSenderRequest.Builder(signInIntent.intentSender).build())
-                true
-            } catch (e2: Exception) {
-                false
+            launchClassicFallback(activity, launcher)
+        }
+    }
+
+    /** Classic getSignInIntent path; also avoids direct `intentSender` property access. */
+    private suspend fun launchClassicFallback(
+        activity: Activity,
+        launcher: androidx.activity.compose.ManagedActivityResultLauncher<
+            IntentSenderRequest,
+            androidx.activity.result.ActivityResult,
+        >,
+    ): Boolean = try {
+        val pending = Identity.getSignInClient(activity)
+            .getSignInIntent(
+                GetSignInIntentRequest.builder()
+                    .setServerClientId(BuildConfig.GOOGLE_WEB_CLIENT_ID)
+                    .build(),
+            ).await()
+        val sender = extractIntentSender(pending) ?: return false
+        launcher.launch(IntentSenderRequest.Builder(sender).build())
+        true
+    } catch (e2: Exception) {
+        false
+    }
+
+    /** Reads the IntentSender out of a PendingIntent reflectively (compile-safe on all 21.x). */
+    private fun extractIntentSender(pendingIntent: Any): android.content.IntentSender? {
+        return try {
+            val m = pendingIntent.javaClass.methods.firstOrNull {
+                it.name == "getIntentSender" && it.parameterCount == 0
             }
+            m?.invoke(pendingIntent) as? android.content.IntentSender
+        } catch (e: Exception) {
+            null
         }
     }
 
