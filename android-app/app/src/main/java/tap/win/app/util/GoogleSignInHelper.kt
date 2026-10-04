@@ -46,6 +46,10 @@ object GoogleSignInHelper {
             IntentSenderRequest,
             androidx.activity.result.ActivityResult,
         >,
+        accountLauncher: androidx.activity.compose.ManagedActivityResultLauncher<
+            android.content.Intent,
+            androidx.activity.result.ActivityResult,
+        >,
     ): Boolean {
         if (!isEnabled) return false
         return try {
@@ -70,12 +74,12 @@ object GoogleSignInHelper {
             // PendingIntent has no compile-time `intentSender` accessor in every 21.x
             // release, so read it via reflection – the field/method always exists at runtime.
             val sender = extractIntentSender(pendingIntent)
-                ?: return launchClassicFallback(activity, launcher)
+                ?: return launchClassicFallback(activity, launcher, accountLauncher)
             launcher.launch(IntentSenderRequest.Builder(sender).build())
             true
         } catch (e: Exception) {
-            // Fallback: classic Google sign-in Intent (works with any play-services-auth version)
-            launchClassicFallback(activity, launcher)
+            // Fallback 1: classic Identity getSignInIntent; fallback 2: GoogleSignIn account picker.
+            launchClassicFallback(activity, launcher, accountLauncher)
         }
     }
 
@@ -86,6 +90,10 @@ object GoogleSignInHelper {
             IntentSenderRequest,
             androidx.activity.result.ActivityResult,
         >,
+        accountLauncher: androidx.activity.compose.ManagedActivityResultLauncher<
+            android.content.Intent,
+            androidx.activity.result.ActivityResult,
+        >,
     ): Boolean {
         return try {
             val pending = Identity.getSignInClient(activity)
@@ -94,10 +102,43 @@ object GoogleSignInHelper {
                         .setServerClientId(BuildConfig.GOOGLE_WEB_CLIENT_ID)
                         .build(),
                 ).await()
-            val sender = extractIntentSender(pending) ?: return false
-            launcher.launch(IntentSenderRequest.Builder(sender).build())
-            true
+            val sender = extractIntentSender(pending)
+            if (sender != null) {
+                launcher.launch(IntentSenderRequest.Builder(sender).build())
+                true
+            } else {
+                launchAccountPicker(activity, accountLauncher)
+            }
         } catch (e2: Exception) {
+            launchAccountPicker(activity, accountLauncher)
+        }
+    }
+
+    /**
+     * Last-resort picker: the classic GoogleSignIn account flow. Its result is a
+     * plain Activity Intent (no IntentSender), delivered through [accountLauncher].
+     */
+    private fun launchAccountPicker(
+        activity: Activity,
+        accountLauncher: androidx.activity.compose.ManagedActivityResultLauncher<
+            android.content.Intent,
+            androidx.activity.result.ActivityResult,
+        >,
+    ): Boolean {
+        return try {
+            val intent = com.google.android.gms.auth.api.signin.GoogleSignIn
+                .getClient(
+                    activity,
+                    com.google.android.gms.auth.api.signin.GoogleSignInOptions.Builder(
+                        com.google.android.gms.auth.api.signin.GoogleSignInOptions.DEFAULT_SIGN_IN,
+                    )
+                        .requestIdToken(BuildConfig.GOOGLE_WEB_CLIENT_ID)
+                        .requestEmail()
+                        .build(),
+                ).signInIntent
+            accountLauncher.launch(intent)
+            true
+        } catch (e: Exception) {
             false
         }
     }
@@ -190,19 +231,11 @@ object GoogleSignInHelper {
 
         // --- Path 2: classic GoogleSignIn account API (always available) ---
         try {
-            val task = com.google.android.gms.auth.api.signin.GoogleSignIn
+            val account = com.google.android.gms.auth.api.signin.GoogleSignIn
                 .getSignedInAccountFromIntent(data)
-            val account = (task as com.google.android.gms.tasks.Task<*>)
                 .getResult(ApiException::class.java)
-                as? com.google.android.gms.auth.api.signin.GoogleSignInAccount
-            if (account != null) {
-                val t = account.idToken
-                    ?: runCatching {
-                        // Request the server auth code flow can also yield an id token here.
-                        account.getId()
-                    }.getOrNull()?.let { null }
-                if (!t.isNullOrBlank()) return t
-            }
+            val t = account?.idToken
+            if (!t.isNullOrBlank()) return t
         } catch (e: Exception) {
             // ignore and try raw intent extras
         }

@@ -581,24 +581,32 @@ fun GoogleSignInButton(
     var loading by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
-    // Registry launcher: receives the Google picker result and finishes sign-in.
-    val launcher = rememberLauncherForActivityResult(
-        ActivityResultContracts.StartIntentSenderForResult(),
-    ) { result ->
+    // Shared handler for both launchers (IntentSender flow + classic account-picker flow).
+    fun handleGoogleResult(data: android.content.Intent?) {
         scope.launch {
             loading = false
-            GoogleSignInHelper.finishSignIn(activity, result.data).fold(
+            GoogleSignInHelper.finishSignIn(activity, data).fold(
                 onSuccess = { onAuthenticated(it) },
                 onFailure = { onError(it.message ?: "فشل تسجيل الدخول بحساب Google") },
             )
         }
     }
 
+    // Registry launcher: receives the Google picker result and finishes sign-in.
+    val launcher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult(),
+    ) { result -> handleGoogleResult(result.data) }
+
+    // Classic GoogleSignIn account-picker fallback returns a plain activity result Intent.
+    val accountLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) { result -> handleGoogleResult(result.data) }
+
     OutlinedButton(
         onClick = {
             loading = true
             scope.launch {
-                val launched = GoogleSignInHelper.launchPicker(activity, launcher)
+                val launched = GoogleSignInHelper.launchPicker(activity, launcher, accountLauncher)
                 if (!launched) loading = false
             }
         },
