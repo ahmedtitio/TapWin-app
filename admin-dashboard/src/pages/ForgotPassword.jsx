@@ -51,7 +51,7 @@ export default function ForgotPassword() {
     <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 20 }}>
       <div className="card" style={{ width: '100%', maxWidth: 420 }}>
         <div style={{ textAlign: 'center', marginBottom: 22 }}>
-          <div className="icon-tile" style={{ '--tile': 'linear-gradient(135deg,#f59e0b,#ef4444)', margin: '0 auto 14px' }}>
+          <div className="icon-tile" style={{ '--tile': '#101010', margin: '0 auto 14px' }}>
             <Icon name="lock" size={24} c1="#fef3c7" c2="#fecaca" />
           </div>
           <h1 style={{ fontSize: 20, fontWeight: 900 }}>استعادة كلمة السر</h1>

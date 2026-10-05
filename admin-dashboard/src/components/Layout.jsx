@@ -1,17 +1,19 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import Icon from './Icons3D';
 import { clearSession, getUser } from '../lib/api';
+import { useI18n } from '../lib/i18n';
 
 const NAV = [
-  { to: '/', label: 'الرئيسية', icon: 'dashboard', end: true },
-  { to: '/users', label: 'إدارة المستخدمين', icon: 'users' },
-  { to: '/analytics', label: 'إحصائيات التطبيق', icon: 'globe' },
-  { to: '/activity', label: 'سجل النشاط', icon: 'activity' },
+  { to: '/', key: 'dashboard', icon: 'dashboard', end: true },
+  { to: '/users', key: 'users', icon: 'users' },
+  { to: '/analytics', key: 'analytics', icon: 'globe' },
+  { to: '/activity', key: 'activity', icon: 'activity' },
+  { to: '/settings', key: 'settings', icon: 'settings' },
 ];
 
 const sidebarStyle = {
   width: 260, minHeight: '100vh', padding: '24px 16px',
-  background: 'linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.02))',
+  background: 'rgba(255,255,255,.08)',
   borderInlineEnd: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 8,
   position: 'sticky', top: 0,
 };
@@ -19,6 +21,7 @@ const sidebarStyle = {
 export default function Layout() {
   const navigate = useNavigate();
   const user = getUser();
+  const { t } = useI18n();
 
   const logout = () => {
     clearSession();
@@ -29,11 +32,11 @@ export default function Layout() {
     <div style={{ display: 'flex' }}>
       <aside style={sidebarStyle}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '6px 10px 20px' }}>
-          <div className="icon-tile" style={{ '--tile': 'linear-gradient(135deg,#6d5dfc,#22d3ee)' }}>
+          <div className="icon-tile" style={{ '--tile': '#101010' }}>
             <Icon name="bolt" size={26} c1="#e9e4ff" c2="#c7f5ff" />
           </div>
           <div>
-            <div style={{ fontWeight: 900, fontSize: 16 }}>لوحة التحكم</div>
+            <div style={{ fontWeight: 900, fontSize: 16 }}>{t('adminPanel')}</div>
             <div style={{ color: 'var(--muted)', fontSize: 12 }}>Admin Dashboard</div>
           </div>
         </div>
@@ -44,14 +47,14 @@ export default function Layout() {
             style={({ isActive }) => ({
               display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px',
               borderRadius: 14, fontWeight: 700, fontSize: 14.5, transition: 'all .15s',
-              background: isActive ? 'linear-gradient(135deg, rgba(109,93,252,.35), rgba(159,123,255,.15))' : 'transparent',
-              border: isActive ? '1px solid rgba(159,123,255,.45)' : '1px solid transparent',
-              boxShadow: isActive ? '0 8px 18px rgba(109,93,252,.25)' : 'none',
+              background: isActive ? 'rgba(255,255,255,.12)' : 'transparent',
+              border: isActive ? '1px solid rgba(255,255,255,.35)' : '1px solid transparent',
+              boxShadow: 'none',
               color: isActive ? '#fff' : 'var(--muted)',
             })}
           >
-            <Icon name={item.icon} size={21} c1={item.active ? '#fff' : '#a5b4fc'} c2={item.active ? '#ddd6fe' : '#6d5dfc'} />
-            {item.label}
+            <Icon name={item.icon} size={21} c1="#ffffff" c2="#d9d9d9" />
+            {t(item.key)}
           </NavLink>
         ))}
 
@@ -66,8 +69,8 @@ export default function Layout() {
             </div>
           </div>
           <button className="btn btn-ghost" style={{ width: '100%' }} onClick={logout}>
-            <Icon name="logout" size={16} c1="#fca5a5" c2="#ef4444" />
-            تسجيل الخروج
+            <Icon name="logout" size={16} c1="#ffffff" c2="#d9d9d9" />
+            {t('logout')}
           </button>
         </div>
       </aside>

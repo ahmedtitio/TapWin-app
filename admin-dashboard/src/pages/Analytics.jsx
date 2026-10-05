@@ -7,10 +7,10 @@ import { getAnalytics } from '../lib/api';
 import { gaEnabled, trackEvent } from '../lib/analytics';
 
 const CARDS = [
-  { key: 'events_24h', label: 'أحداث آخر ٢٤ ساعة', icon: 'bolt', tile: 'linear-gradient(135deg,#f59e0b,#fbbf24)', c1: '#fef3c7', c2: '#fcd34d' },
-  { key: 'dau', label: 'مستخدمون نشطون يوميًا (DAU)', icon: 'activity', tile: 'linear-gradient(135deg,#10b981,#34d399)', c1: '#d1fae5', c2: '#6ee7b7' },
-  { key: 'wau', label: 'مستخدمون نشطون أسبوعيًا (WAU)', icon: 'users', tile: 'linear-gradient(135deg,#6d5dfc,#9f7bff)', c1: '#e9e4ff', c2: '#c4b5fd' },
-  { key: 'events_total', label: 'إجمالي الأحداث', icon: 'chart', tile: 'linear-gradient(135deg,#0ea5e9,#22d3ee)', c1: '#cffafe', c2: '#67e8f9' },
+  { key: 'events_24h', label: 'أحداث آخر ٢٤ ساعة', icon: 'bolt', tile: '#101010', c1: '#fef3c7', c2: '#fcd34d' },
+  { key: 'dau', label: 'مستخدمون نشطون يوميًا (DAU)', icon: 'activity', tile: '#101010', c1: '#d1fae5', c2: '#6ee7b7' },
+  { key: 'wau', label: 'مستخدمون نشطون أسبوعيًا (WAU)', icon: 'users', tile: '#101010', c1: '#e9e4ff', c2: '#c4b5fd' },
+  { key: 'events_total', label: 'إجمالي الأحداث', icon: 'chart', tile: '#101010', c1: '#cffafe', c2: '#67e8f9' },
 ];
 
 const chartTooltipStyle = {
@@ -43,7 +43,7 @@ export default function Analytics() {
     <div>
       <header style={{ marginBottom: 24 }}>
         <h1 style={{ fontSize: 24, fontWeight: 900, display: 'flex', alignItems: 'center', gap: 12 }}>
-          <Icon name="globe" size={28} c1="#a5b4fc" c2="#6d5dfc" />
+          <Icon name="globe" size={28} c1="#a5b4fc" c2="#ffffff" />
           إحصائيات التطبيق
         </h1>
         <p style={{ color: 'var(--muted)', marginTop: 6 }}>
@@ -68,7 +68,7 @@ export default function Analytics() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16, marginBottom: 24 }}>
         <div className="card">
           <h3 style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10, fontSize: 16 }}>
-            <Icon name="chart" size={20} c1="#a5f3fc" c2="#22d3ee" />
+            <Icon name="chart" size={20} c1="#a5f3fc" c2="#ffffff" />
             الأحداث اليومية — آخر ١٤ يومًا
           </h3>
           <div dir="ltr" style={{ width: '100%', height: 260 }}>
@@ -85,7 +85,7 @@ export default function Analytics() {
                 <YAxis allowDecimals={false} tick={{ fill: '#9aa7c7', fontSize: 11 }} tickLine={false} axisLine={false} />
                 <Tooltip contentStyle={chartTooltipStyle} />
                 <Area type="monotone" dataKey="events" name="أحداث" stroke="#8b5cf6" strokeWidth={2.5} fill="url(#gradEv)" />
-                <Area type="monotone" dataKey="users" name="مستخدمون" stroke="#22d3ee" strokeWidth={2.5} fill="transparent" />
+                <Area type="monotone" dataKey="users" name="مستخدمون" stroke="#ffffff" strokeWidth={2.5} fill="transparent" />
               </AreaChart>
             </ResponsiveContainer>
           </div>

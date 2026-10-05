@@ -64,9 +64,9 @@ export function StatusBadge({ online }) {
 }
 
 export function AccountBadge({ isActive, role }) {
-  if (role === 'admin') return <span className="badge badge-admin"><Icon name="shield" size={12} c1="#d8ccff" c2="#9f7bff" /> مشرف</span>;
+  if (role === 'admin') return <span className="badge badge-admin"><Icon name="shield" size={12} c1="#d8ccff" c2="#d9d9d9" /> مشرف</span>;
   return isActive
-    ? <span className="badge badge-active"><Icon name="check" size={12} c1="#a5f3fc" c2="#22d3ee" /> مفعّل</span>
+    ? <span className="badge badge-active"><Icon name="check" size={12} c1="#a5f3fc" c2="#ffffff" /> مفعّل</span>
     : <span className="badge badge-disabled"><Icon name="power" size={12} c1="#fecaca" c2="#f87171" /> معطّل</span>;
 }
 

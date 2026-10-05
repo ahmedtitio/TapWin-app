@@ -6,11 +6,11 @@ import Icon from '../components/Icons3D';
 import { getStats } from '../lib/api';
 
 const CARDS = [
-  { key: 'total_users', label: 'إجمالي المستخدمين', icon: 'users', tile: 'linear-gradient(135deg,#6d5dfc,#9f7bff)', c1: '#e9e4ff', c2: '#c4b5fd' },
-  { key: 'online_now', label: 'متصل الآن', icon: 'activity', tile: 'linear-gradient(135deg,#10b981,#34d399)', c1: '#d1fae5', c2: '#6ee7b7' },
-  { key: 'active_users', label: 'حسابات مفعّلة', icon: 'check', tile: 'linear-gradient(135deg,#0ea5e9,#22d3ee)', c1: '#cffafe', c2: '#67e8f9' },
-  { key: 'disabled_users', label: 'حسابات معطّلة', icon: 'power', tile: 'linear-gradient(135deg,#ef4444,#f97316)', c1: '#fee2e2', c2: '#fca5a5' },
-  { key: 'new_this_week', label: 'تسجيلات هذا الأسبوع', icon: 'plus', tile: 'linear-gradient(135deg,#f59e0b,#fbbf24)', c1: '#fef3c7', c2: '#fcd34d' },
+  { key: 'total_users', label: 'إجمالي المستخدمين', icon: 'users', tile: '#101010', c1: '#e9e4ff', c2: '#c4b5fd' },
+  { key: 'online_now', label: 'متصل الآن', icon: 'activity', tile: '#101010', c1: '#d1fae5', c2: '#6ee7b7' },
+  { key: 'active_users', label: 'حسابات مفعّلة', icon: 'check', tile: '#101010', c1: '#cffafe', c2: '#67e8f9' },
+  { key: 'disabled_users', label: 'حسابات معطّلة', icon: 'power', tile: '#101010', c1: '#fee2e2', c2: '#fca5a5' },
+  { key: 'new_this_week', label: 'تسجيلات هذا الأسبوع', icon: 'plus', tile: '#101010', c1: '#fef3c7', c2: '#fcd34d' },
 ];
 
 const chartTooltipStyle = {
@@ -36,7 +36,7 @@ export default function Dashboard() {
     <div>
       <header style={{ marginBottom: 24 }}>
         <h1 style={{ fontSize: 24, fontWeight: 900, display: 'flex', alignItems: 'center', gap: 12 }}>
-          <Icon name="dashboard" size={28} c1="#a5b4fc" c2="#6d5dfc" />
+          <Icon name="dashboard" size={28} c1="#a5b4fc" c2="#ffffff" />
           نظرة عامة
         </h1>
         <p style={{ color: 'var(--muted)', marginTop: 6 }}>إحصائيات التطبيق وحالة الاتصال اللحظية</p>
@@ -58,7 +58,7 @@ export default function Dashboard() {
 
       <div className="card">
         <h3 style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10, fontSize: 16 }}>
-          <Icon name="chart" size={20} c1="#a5f3fc" c2="#22d3ee" />
+          <Icon name="chart" size={20} c1="#a5f3fc" c2="#ffffff" />
           النشاط خلال آخر ١٤ يومًا
         </h3>
         <div dir="ltr" style={{ width: '100%', height: 280 }}>
@@ -70,8 +70,8 @@ export default function Dashboard() {
                   <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0.03} />
                 </linearGradient>
                 <linearGradient id="gradLog" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#22d3ee" stopOpacity={0.5} />
-                  <stop offset="100%" stopColor="#22d3ee" stopOpacity={0.03} />
+                  <stop offset="0%" stopColor="#ffffff" stopOpacity={0.5} />
+                  <stop offset="100%" stopColor="#ffffff" stopOpacity={0.03} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.07)" vertical={false} />
@@ -79,7 +79,7 @@ export default function Dashboard() {
               <YAxis allowDecimals={false} tick={{ fill: '#9aa7c7', fontSize: 11 }} tickLine={false} axisLine={false} />
               <Tooltip contentStyle={chartTooltipStyle} />
               <Area type="monotone" dataKey="signups" name="تسجيلات جديدة" stroke="#8b5cf6" strokeWidth={2.5} fill="url(#gradSign)" />
-              <Area type="monotone" dataKey="logins" name="عمليات دخول" stroke="#22d3ee" strokeWidth={2.5} fill="url(#gradLog)" />
+              <Area type="monotone" dataKey="logins" name="عمليات دخول" stroke="#ffffff" strokeWidth={2.5} fill="url(#gradLog)" />
             </AreaChart>
           </ResponsiveContainer>
         </div>

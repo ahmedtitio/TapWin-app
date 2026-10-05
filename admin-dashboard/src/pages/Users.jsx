@@ -140,7 +140,7 @@ export default function Users() {
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 14, marginBottom: 22 }}>
         <div>
           <h1 style={{ fontSize: 24, fontWeight: 900, display: 'flex', alignItems: 'center', gap: 12 }}>
-            <Icon name="users" size={28} c1="#a5b4fc" c2="#6d5dfc" />
+            <Icon name="users" size={28} c1="#a5b4fc" c2="#ffffff" />
             إدارة المستخدمين
           </h1>
           <p style={{ color: 'var(--muted)', marginTop: 6 }}>{total} مستخدم — حالة الاتصال تُحدَّث لحظيًا من التطبيق</p>
@@ -154,7 +154,7 @@ export default function Users() {
       <div className="card" style={{ padding: 16, marginBottom: 18, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
         <div style={{ position: 'relative', flex: '1 1 240px' }}>
           <span style={{ position: 'absolute', insetInlineStart: 12, top: '50%', transform: 'translateY(-50%)', opacity: .6 }}>
-            <Icon name="search" size={17} c1="#a5b4fc" c2="#6d5dfc" />
+            <Icon name="search" size={17} c1="#a5b4fc" c2="#ffffff" />
           </span>
           <input
             className="input" style={{ paddingInlineStart: 40 }} placeholder="بحث بالاسم أو اسم المستخدم أو البريد…"
@@ -205,7 +205,7 @@ export default function Users() {
                   <td>
                     <div style={{ display: 'flex', gap: 6 }}>
                       <button className="btn btn-ghost btn-sm" title="عرض التفاصيل" onClick={() => openDetail(u)}>
-                        <Icon name="eye" size={14} c1="#a5f3fc" c2="#22d3ee" />
+                        <Icon name="eye" size={14} c1="#a5f3fc" c2="#ffffff" />
                       </button>
                       <button className="btn btn-ghost btn-sm" title={u.is_active ? 'تعطيل الحساب' : 'تفعيل الحساب'} onClick={() => toggleActive(u)}>
                         <Icon name="power" size={14} c1={u.is_active ? '#fca5a5' : '#6ee7b7'} c2={u.is_active ? '#ef4444' : '#10b981'} />

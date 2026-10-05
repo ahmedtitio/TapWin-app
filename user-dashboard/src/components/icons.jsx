@@ -102,7 +102,7 @@ export const IconLogout = ({ size }) => (
 export const IconBolt = ({ size }) => (
   <Svg size={size}>
     <defs>
-      <linearGradient id="b1" x1="7" y1="2" x2="17" y2="22"><stop stopColor="#a5b4fc"/><stop offset="1" stopColor="#4f46e5"/></linearGradient>
+      <linearGradient id="b1" x1="7" y1="2" x2="17" y2="22"><stop stopColor="#a5b4fc"/><stop offset="1" stopColor="#1a1a1a"/></linearGradient>
     </defs>
     <path d="M13.2 2 4.8 13h5L9.4 22l9-11.6h-5.4L13.2 2Z" fill="url(#b1)" stroke="#e0e7ff" strokeWidth="1" strokeLinejoin="round"/>
     <path d="M13.2 2 4.8 13h5" fill="#fff" opacity=".18"/>
@@ -121,7 +121,7 @@ export const IconActivity = ({ size }) => (
 export const IconEye = ({ size }) => (
   <Svg size={size}>
     <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" fill="#1e293b" stroke="#94a3b8" strokeWidth="1.4"/>
-    <circle cx="12" cy="12" r="3.2" fill="#6d5dfc" stroke="#c4b5fd" strokeWidth="1"/>
+    <circle cx="12" cy="12" r="3.2" fill="#ffffff" stroke="#c4b5fd" strokeWidth="1"/>
     <circle cx="11" cy="11" r="1" fill="#fff" opacity=".8"/>
   </Svg>
 );
@@ -129,7 +129,7 @@ export const IconEye = ({ size }) => (
 export const IconEyeOff = ({ size }) => (
   <Svg size={size}>
     <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" fill="#1e293b" stroke="#94a3b8" strokeWidth="1.4"/>
-    <circle cx="12" cy="12" r="3.2" fill="#6d5dfc" stroke="#c4b5fd" strokeWidth="1"/>
+    <circle cx="12" cy="12" r="3.2" fill="#ffffff" stroke="#c4b5fd" strokeWidth="1"/>
     <path d="M4 20 20 4" stroke="#f87171" strokeWidth="2.4" strokeLinecap="round"/>
   </Svg>
 );

@@ -202,14 +202,14 @@ object GoogleSignInHelper {
                     "تعذّر الحصول على رمز Google من شاشة اختيار الحساب — جرّب مرة أخرى وتأكد من تسجيل الدخول بحسابك في إعدادات Google على الجهاز.",
                 ),
             )
+            // The backend accepts ANY OAuth client id belonging to project
+            // tapwin-app (web + android clients), so a mismatch with the web id
+            // alone must NOT block sign-in — it was rejecting perfectly valid
+            // Android-client tokens and surfacing INVALID_GOOGLE_TOKEN. We only
+            // log the audience for diagnostics now.
             val aud = tokenAudience(idToken)
             if (aud != null && expectedAud.isNotBlank() && aud != expectedAud) {
-                android.util.Log.e("TapWin", "GOOGLE_AUD_MISMATCH got=$aud expected=$expectedAud")
-                return Result.failure(
-                    Exception(
-                        "رمز Google صادر عن إعداد عميل قديم (aud=$aud). امحُ بيانات التطبيق أو سجّل الخروج ثم أعد المحاولة بعد تثبيت نسخة محدّثة.",
-                    ),
-                )
+                android.util.Log.w("TapWin", "GOOGLE_AUD differs from web id (allowed): got=$aud")
             }
 
             // Primary path: send the raw Google ID token straight to our backend,
@@ -227,28 +227,12 @@ object GoogleSignInHelper {
                 .signInWithCredential(GoogleAuthProvider.getCredential(idToken, null))
                 .await()
             val firebaseUser = firebaseResult.user
-                ?: return Result.failure(Exception("فشل تسجيل الدخول عبر Firebase: راجع SHA-1 للتوقيع في مشروع Firebase"))
+                ?: return Result.failure(Exception(tap.win.app.ui.S.firebaseShaHint))
 
             // 2) Send the Firebase ID token to our backend to get a Tap Win session.
             // Task<GetTokenResult>.await() returns GetTokenResult directly; its `.token` is the string.
             val tokenResult = firebaseUser.getIdToken(true).await()
-            val response = ApiClient.authApi.firebaseLogin(
-                FirebaseLoginRequest(
-                    idToken = tokenResult?.token ?: firebaseUser.uid,
-                    deviceId = ApiClient.deviceId,
-                    deviceName = ApiClient.deviceName,
-                ),
-            )
-            if (response.isSuccessful && response.body() != null) {
-                Result.success(response.body()!!)
-            } else {
-                val err = runCatching {
-                    response.errorBody()?.string()?.let { body ->
-                        org.json.JSONObject(body).optString("error")
-                    }
-                }.getOrNull()
-                Result.failure(Exception(err ?: "فشل تسجيل الدخول عبر الخادم (${response.code()})"))
-            }
+            Result.success(googleLogin(tokenResult?.token ?: firebaseUser.uid, activity))
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -281,7 +265,7 @@ object GoogleSignInHelper {
                 }
             }
         }.getOrNull()
-        throw Exception(msg ?: "فشل تسجيل الدخول عبر الخادم (${response.code()})")
+        throw Exception(msg ?: tap.win.app.ui.S.serverFail(response.code()))
     }
 
     /**

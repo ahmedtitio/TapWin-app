@@ -33,21 +33,21 @@ function Overview({ user, me, devices, activity }) {
 
       <div className="grid grid-3" style={{ marginBottom: 20 }}>
         <div className="card stat-card">
-          <div className="icon-tile" style={{ '--tile': 'linear-gradient(135deg,#34d399,#059669)' }}><IconShield /></div>
+          <div className="icon-tile" style={{ '--tile': '#101010' }}><IconShield /></div>
           <div>
             <div className="stat-value">{devices.length}</div>
             <div className="stat-label">جهاز مرتبط بالحساب</div>
           </div>
         </div>
         <div className="card stat-card">
-          <div className="icon-tile" style={{ '--tile': 'linear-gradient(135deg,#a78bfa,#6d28d9)' }}><IconActivity /></div>
+          <div className="icon-tile" style={{ '--tile': '#101010' }}><IconActivity /></div>
           <div>
             <div className="stat-value">{activity.length}</div>
             <div className="stat-label">آخر أحداث النشاط</div>
           </div>
         </div>
         <div className="card stat-card">
-          <div className="icon-tile" style={{ '--tile': 'linear-gradient(135deg,#fbbf24,#d97706)' }}><IconBolt /></div>
+          <div className="icon-tile" style={{ '--tile': '#101010' }}><IconBolt /></div>
           <div>
             <div className="stat-value">{activeDevice ? 'نشط' : 'غير متصل'}</div>
             <div className="stat-label">حالة التطبيق الآن</div>
@@ -58,7 +58,7 @@ function Overview({ user, me, devices, activity }) {
       <div className="grid grid-2">
         <div className="card">
           <div className="list-item">
-            <div className="icon-tile" style={{ '--tile': 'linear-gradient(135deg,#67e8f9,#0891b2)' }}><IconDevices /></div>
+            <div className="icon-tile" style={{ '--tile': '#101010' }}><IconDevices /></div>
             <div>
               <div className="list-title">الجهاز الحالي</div>
               <div className="list-sub">
@@ -69,7 +69,7 @@ function Overview({ user, me, devices, activity }) {
             </div>
           </div>
           <div className="list-item">
-            <div className="icon-tile" style={{ '--tile': 'linear-gradient(135deg,#86efac,#16a34a)' }}><IconUser /></div>
+            <div className="icon-tile" style={{ '--tile': '#101010' }}><IconUser /></div>
             <div>
               <div className="list-title">عضو منذ</div>
               <div className="list-sub">{new Date(user.created_at).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
@@ -82,7 +82,7 @@ function Overview({ user, me, devices, activity }) {
           {activity.length === 0 && <div className="list-sub">لا يوجد نشاط بعد</div>}
           {activity.slice(0, 6).map((a, i) => (
             <div className="list-item" key={i}>
-              <div className="icon-tile" style={{ width: 40, height: 40, borderRadius: 12, '--tile': 'linear-gradient(135deg,#a5b4fc,#4f46e5)' }}><IconActivity size={18} /></div>
+              <div className="icon-tile" style={{ width: 40, height: 40, borderRadius: 12, '--tile': '#101010' }}><IconActivity size={18} /></div>
               <div>
                 <div className="list-title">{a.action || a.event || a.type || 'حدث'}</div>
                 <div className="list-sub">{ago(a.created_at)}{a.platform ? ` · ${a.platform}` : ''}</div>
@@ -180,7 +180,7 @@ function Devices({ devices }) {
           const isOn = dv.is_active || dv.active;
           return (
             <div className="list-item" key={i}>
-              <div className="icon-tile" style={{ '--tile': isOn ? 'linear-gradient(135deg,#86efac,#16a34a)' : 'linear-gradient(135deg,#94a3b8,#475569)' }}>
+              <div className="icon-tile" style={{ '--tile': isOn ? '#101010' : '#101010' }}>
                 <IconDevices />
               </div>
               <div style={{ flex: 1 }}>
@@ -207,7 +207,7 @@ function Activity({ activity }) {
         {activity.length === 0 && <div className="list-sub">لا يوجد نشاط بعد</div>}
         {activity.map((a, i) => (
           <div className="list-item" key={i}>
-            <div className="icon-tile" style={{ width: 40, height: 40, borderRadius: 12, '--tile': 'linear-gradient(135deg,#5eead4,#0d9488)' }}><IconActivity size={18} /></div>
+            <div className="icon-tile" style={{ width: 40, height: 40, borderRadius: 12, '--tile': '#101010' }}><IconActivity size={18} /></div>
             <div style={{ flex: 1 }}>
               <div className="list-title">{a.action || a.event || a.type || 'حدث'}</div>
               <div className="list-sub">{ago(a.created_at)}{a.ip ? ` · ${a.ip}` : ''}{a.platform ? ` · ${a.platform}` : ''}</div>

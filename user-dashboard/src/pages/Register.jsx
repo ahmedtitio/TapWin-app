@@ -78,7 +78,7 @@ export default function Register() {
     return (
       <div className="auth-shell">
         <div className="card auth-card">
-          <div className="icon-tile icon-tile-lg" style={{ '--tile': 'linear-gradient(135deg,#f59e0b,#d97706)' }}><IconMail /></div>
+          <div className="icon-tile icon-tile-lg" style={{ '--tile': '#101010' }}><IconMail /></div>
           <h1 className="auth-title">تأكيد البريد الإلكتروني</h1>
           <p className="auth-sub">
             أدخل رمز التحقق المرسل إلى<br />
@@ -104,7 +104,7 @@ export default function Register() {
   return (
     <div className="auth-shell">
       <form className="card auth-card" onSubmit={submit}>
-        <div className="icon-tile icon-tile-lg" style={{ '--tile': 'linear-gradient(135deg,#22d3ee,#0891b2)' }}><IconUser /></div>
+        <div className="icon-tile icon-tile-lg" style={{ '--tile': '#101010' }}><IconUser /></div>
         <h1 className="auth-title">إنشاء حساب جديد</h1>
         <p className="auth-sub">سجّل بياناتك وسيصلك رمز تأكيد على البريد قبل الدخول للوحة</p>
 

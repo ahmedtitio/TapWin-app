@@ -51,7 +51,7 @@ export default function ForgotPassword() {
   return (
     <div className="auth-shell">
       <div className="card auth-card">
-        <div className="icon-tile icon-tile-lg" style={{ '--tile': 'linear-gradient(135deg,#fbbf24,#d97706)' }}><IconKey /></div>
+        <div className="icon-tile icon-tile-lg" style={{ '--tile': '#101010' }}><IconKey /></div>
 
         {step === 'email' ? (
           <form onSubmit={sendCode}>

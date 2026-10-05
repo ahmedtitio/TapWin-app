@@ -1,23 +1,19 @@
-# Dependencies
 node_modules/
-
-# Environment files
 .env
 .env.local
-.env.*
-# Build outputs & caches
+.env.*.local
 dist/
 build/
 .wrangler/
-.cache/
-*.log
-
-# Signing & secrets
 *.jks
 *.keystore
+keystore/
 secrets/
+.gradle/
 local.properties
-codemagic-signing*
-
-# OS
+.vscode/
+.idea/
+*.swp
+*.swo
 .DS_Store
+Thumbs.db

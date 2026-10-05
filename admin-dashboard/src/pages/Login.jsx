@@ -34,7 +34,7 @@ export default function Login() {
     <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 20 }}>
       <div className="card" style={{ width: '100%', maxWidth: 420 }}>
         <div style={{ textAlign: 'center', marginBottom: 26 }}>
-          <div className="icon-tile" style={{ '--tile': 'linear-gradient(135deg,#6d5dfc,#22d3ee)', margin: '0 auto 14px', width: 64, height: 64, borderRadius: 20 }}>
+          <div className="icon-tile" style={{ '--tile': '#101010', margin: '0 auto 14px', width: 64, height: 64, borderRadius: 20 }}>
             <Icon name="shield" size={32} c1="#eef2ff" c2="#c7f5ff" />
           </div>
           <h1 style={{ fontSize: 22, fontWeight: 900 }}>لوحة تحكم الأدمن</h1>
@@ -58,7 +58,7 @@ export default function Login() {
           </button>
 
           <button type="button" className="btn btn-ghost" style={{ width: '100%', marginTop: 10 }} onClick={() => navigate('/forgot')}>
-            <Icon name="mail" size={16} c1="#a5b4fc" c2="#6d5dfc" />
+            <Icon name="mail" size={16} c1="#a5b4fc" c2="#ffffff" />
             نسيت كلمة السر؟
           </button>
         </form>

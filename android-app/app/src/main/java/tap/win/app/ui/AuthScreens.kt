@@ -60,29 +60,34 @@ import tap.win.app.util.Analytics
 import tap.win.app.util.GoogleSignInHelper
 import retrofit2.Response
 
-val Brand = Color(0xFF6C4DF6)
-val BrandDark = Color(0xFF2A1E63)
-val Accent = Color(0xFF00D4AA)
+val Brand = Color.White
+val BrandDark = Color(0xFF1A1A1A)
+val Accent = Color.White
+// Monochrome theme tokens: pure black background, white text, glass surfaces.
+val GlassSurface = Color(0xFF141414)          // card / sheet fill
+val GlassBorder = Color(0x33FFFFFF)           // 20% white hairline
+val GlassFill = Color(0x14FFFFFF)             // 8% white frosted fill
 
 @Composable
 fun GradientBackground(content: @Composable () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Brush.verticalGradient(listOf(BrandDark, Color(0xFF120B33), Color.Black))),
+            // Solid black background — no gradients anywhere in the app.
+            .background(Color.Black),
     ) { content() }
 }
 
 @Composable
 fun ErrorMessage(text: String) {
     Surface(
-        color = Color(0xFFFF5470).copy(alpha = 0.12f),
+        color = GlassFill,
         shape = RoundedCornerShape(12.dp),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Text(
             text = text,
-            color = Color(0xFFFF8FA3),
+            color = Color.White,
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
         )
@@ -157,8 +162,8 @@ fun GradientButton(
             defaultElevation = 2.dp, pressedElevation = 4.dp, disabledElevation = 0.dp,
         ),
         colors = ButtonDefaults.buttonColors(
-            containerColor = Brand,
-            contentColor = Color.White,
+            containerColor = Color.White,
+            contentColor = Color.Black,
             disabledContainerColor = Color.White.copy(alpha = 0.12f),
             disabledContentColor = Color.White.copy(alpha = 0.45f),
         ),
@@ -167,7 +172,7 @@ fun GradientButton(
             .heightIn(min = 52.dp),
     ) {
         if (loading) {
-            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(22.dp))
+            CircularProgressIndicator(color = Color.Black, modifier = Modifier.size(22.dp))
         } else {
             Text(text = text, fontWeight = FontWeight.Bold, fontSize = 16.sp)
         }
@@ -240,7 +245,7 @@ fun GoogleGradientButton(
             }
             Spacer(Modifier.width(12.dp))
             Text(
-                "المتابعة باستخدام حساب Google",
+                tap.win.app.ui.S.continueGoogle,
                 fontWeight = FontWeight.Bold,
                 fontSize = 15.sp,
                 color = Color(0xFF1F1F1F),
@@ -273,12 +278,31 @@ fun errorMessage(raw: Response<*>): String {
         raw.errorBody()?.let { body ->
             val gson = com.google.gson.Gson()
             val err = gson.fromJson(body.charStream(), ApiError::class.java)
-            err.message ?: "حدث خطأ، حاول مرة أخرى"
-        } ?: "تعذر الاتصال بالخادم"
-    }.getOrDefault("تعذر الاتصال بالخادم")
+            err.message ?: tap.win.app.ui.S.genericError
+        } ?: tap.win.app.ui.S.serverUnreachable
+    }.getOrDefault(tap.win.app.ui.S.serverUnreachable)
 }
 
 sealed class AuthMode { object Login : AuthMode(); object Register : AuthMode(); object Forgot : AuthMode(); object Verify : AuthMode() }
+
+/** Floating language toggle (عربي/English) shown on every auth screen. */
+@Composable
+fun LanguageToggle(modifier: Modifier = Modifier) {
+    val ctx = LocalContext.current
+    OutlinedButton(
+        onClick = {
+            val next = if (tap.win.app.util.I18n.english()) tap.win.app.util.I18n.LANG_AR else tap.win.app.util.I18n.LANG_EN
+            tap.win.app.util.I18n.set(ctx, next)
+            (ctx as? android.app.Activity)?.recreate()
+        },
+        shape = RoundedCornerShape(14.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, GlassBorder),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+        modifier = modifier,
+    ) {
+        Text(if (tap.win.app.util.I18n.english()) "العربية" else "English", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+    }
+}
 
 @Composable
 fun AuthScreen(
@@ -286,13 +310,25 @@ fun AuthScreen(
     onModeChange: (AuthMode) -> Unit,
     onAuthenticated: (AuthResponse) -> Unit,
 ) {
-    val appCtx = LocalContext.current.applicationContext
+    val activity = LocalContext.current
+    val appCtx = activity.applicationContext
     val onAuthed: (AuthResponse) -> Unit = { resp ->
         // Now that a session exists, upload the FCM push token for this device.
         TapWinMessagingService.register(appCtx)
+        if (resp.isNewUser) {
+            android.widget.Toast.makeText(activity, S.googleWelcome,
+                android.widget.Toast.LENGTH_LONG).show()
+        }
         onAuthenticated(resp)
     }
     GradientBackground {
+        Box(Modifier.fillMaxSize()) {
+        // Language toggle pinned to the top-end corner of every auth screen.
+        LanguageToggle(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = 18.dp, end = 18.dp),
+        )
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -301,25 +337,24 @@ fun AuthScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Spacer(Modifier.height(48.dp))
-            Icon3D(
-                icon = Icons.Filled.Lock,
-                colors = listOf(Brand, Color(0xFFB543F5)),
-                size = 96,
-                rotation = -6f,
+            Image(
+                painter = painterResource(id = R.drawable.ic_app_logo),
+                contentDescription = S.appName,
+                modifier = Modifier.size(96.dp),
             )
             Spacer(Modifier.height(16.dp))
             Text(
-                "Tap Win",
+                S.appName,
                 style = MaterialTheme.typography.headlineMedium,
                 color = Color.White,
                 fontWeight = FontWeight.ExtraBold,
             )
             Text(
                 when (mode) {
-                    AuthMode.Login -> "سجّل الدخول للمتابعة"
-                    AuthMode.Register -> "أنشئ حسابًا جديدًا"
-                    AuthMode.Forgot -> "استعادة كلمة السر"
-                    AuthMode.Verify -> "تأكيد البريد الإلكتروني"
+                    AuthMode.Login -> S.loginTitle
+                    AuthMode.Register -> S.registerTitle
+                    AuthMode.Forgot -> S.forgotTitle
+                    AuthMode.Verify -> S.verifyTitle
                 },
                 color = Color.White.copy(alpha = 0.6f),
             )
@@ -333,10 +368,12 @@ fun AuthScreen(
             }
         }
     }
+    }
 }
 
 @Composable
 private fun LoginForm(onModeChange: (AuthMode) -> Unit, onAuthenticated: (AuthResponse) -> Unit) {
+    val ctx = LocalContext.current
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
@@ -344,15 +381,15 @@ private fun LoginForm(onModeChange: (AuthMode) -> Unit, onAuthenticated: (AuthRe
 
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         error?.let { ErrorMessage(it); Spacer(Modifier.height(2.dp)) }
-        AuthTextField(email, { email = it }, "البريد الإلكتروني", Icons.Filled.MailOutline,
+        AuthTextField(email, { email = it }, S.email, Icons.Filled.MailOutline,
             keyboardType = androidx.compose.ui.text.input.KeyboardType.Email)
-        AuthTextField(password, { password = it }, "كلمة السر", Icons.Filled.Lock, isPassword = true)
+        AuthTextField(password, { password = it }, S.password, Icons.Filled.Lock, isPassword = true)
 
         TextButton(onClick = { onModeChange(AuthMode.Forgot) }) {
-            Text("نسيت كلمة السر؟", color = Accent)
+            Text(S.forgotPassword, color = Accent)
         }
 
-        GradientButton(text = "تسجيل الدخول", loading = loading, onClick = {
+        GradientButton(text = S.signIn, loading = loading, onClick = {
             loading = true; error = null
             kotlinx.coroutines.MainScope().launch {
                 val res = ApiClient.authApi.login(
@@ -367,6 +404,8 @@ private fun LoginForm(onModeChange: (AuthMode) -> Unit, onAuthenticated: (AuthRe
                         pendingVerify = body
                         onModeChange(AuthMode.Verify)
                     } else {
+                        android.widget.Toast.makeText(ctx,
+                            S.welcomeBack, android.widget.Toast.LENGTH_SHORT).show()
                         onAuthenticated(body)
                     }
                 } else error = errorMessage(res)
@@ -374,9 +413,9 @@ private fun LoginForm(onModeChange: (AuthMode) -> Unit, onAuthenticated: (AuthRe
         })
         GoogleSignInButton(onAuthenticated = onAuthenticated, onError = { error = it })
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-            Text("ليس لديك حساب؟ ", color = Color.White.copy(alpha = 0.6f))
+            Text(S.noAccount, color = Color.White.copy(alpha = 0.6f))
             TextButton(onClick = { onModeChange(AuthMode.Register) }) {
-                Text("إنشاء حساب", color = Brand, fontWeight = FontWeight.Bold)
+                Text(S.createAccount, color = Brand, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -387,6 +426,7 @@ private var pendingVerify: AuthResponse? = null
 
 @Composable
 private fun RegisterForm(onModeChange: (AuthMode) -> Unit, onAuthenticated: (AuthResponse) -> Unit) {
+    val ctx = LocalContext.current
     var name by remember { mutableStateOf("") }
     var username by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
@@ -398,16 +438,16 @@ private fun RegisterForm(onModeChange: (AuthMode) -> Unit, onAuthenticated: (Aut
 
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         error?.let { ErrorMessage(it) }
-        AuthTextField(name, { name = it }, "الاسم الكامل", Icons.Filled.Person)
-        AuthTextField(username, { username = it }, "اسم المستخدم", Icons.Filled.Person)
-        AuthTextField(email, { email = it }, "البريد الإلكتروني", Icons.Filled.MailOutline,
+        AuthTextField(name, { name = it }, S.fullName, Icons.Filled.Person)
+        AuthTextField(username, { username = it }, S.username, Icons.Filled.Person)
+        AuthTextField(email, { email = it }, S.email, Icons.Filled.MailOutline,
             keyboardType = androidx.compose.ui.text.input.KeyboardType.Email)
-        AuthTextField(phone, { phone = it }, "رقم الهاتف (اختياري)", Icons.Filled.Phone,
+        AuthTextField(phone, { phone = it }, S.phoneOptional, Icons.Filled.Phone,
             keyboardType = androidx.compose.ui.text.input.KeyboardType.Phone)
-        AuthTextField(password, { password = it }, "كلمة السر", Icons.Filled.Lock, isPassword = true)
-        AuthTextField(confirm, { confirm = it }, "تأكيد كلمة السر", Icons.Filled.Lock, isPassword = true)
+        AuthTextField(password, { password = it }, S.password, Icons.Filled.Lock, isPassword = true)
+        AuthTextField(confirm, { confirm = it }, S.confirmPassword, Icons.Filled.Lock, isPassword = true)
 
-        GradientButton(text = "إنشاء الحساب", loading = loading, onClick = {
+        GradientButton(text = S.signUp, loading = loading, onClick = {
             if (password == confirm) {
             loading = true; error = null
             kotlinx.coroutines.MainScope().launch {
@@ -425,18 +465,20 @@ private fun RegisterForm(onModeChange: (AuthMode) -> Unit, onAuthenticated: (Aut
                 loading = false
                 if (res.isSuccessful && res.body() != null) {
                     Analytics.register()
+                    android.widget.Toast.makeText(ctx, S.accountCreated,
+                        android.widget.Toast.LENGTH_SHORT).show()
                     // New accounts must confirm the emailed code before entering the dashboard.
                     pendingVerify = res.body()!!
                     onModeChange(AuthMode.Verify)
                 } else error = errorMessage(res)
             }
-            } else error = "كلمتا السر غير متطابقتين"
+            } else error = S.passwordMismatch
         })
         GoogleSignInButton(onAuthenticated = onAuthenticated, onError = { error = it })
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-            Text("لديك حساب بالفعل؟ ", color = Color.White.copy(alpha = 0.6f))
+            Text(S.haveAccount, color = Color.White.copy(alpha = 0.6f))
             TextButton(onClick = { onModeChange(AuthMode.Login) }) {
-                Text("تسجيل الدخول", color = Brand, fontWeight = FontWeight.Bold)
+                Text(S.signIn, color = Brand, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -462,9 +504,9 @@ private fun ForgotForm(onModeChange: (AuthMode) -> Unit) {
             }
         }
         if (step == 0) {
-            AuthTextField(email, { email = it }, "البريد الإلكتروني", Icons.Filled.MailOutline,
+            AuthTextField(email, { email = it }, S.email, Icons.Filled.MailOutline,
                 keyboardType = androidx.compose.ui.text.input.KeyboardType.Email)
-            GradientButton(text = "إرسال رمز التحقق", loading = loading, onClick = {
+            GradientButton(text = S.sendCode, loading = loading, onClick = {
                 loading = true; error = null; info = null
                 kotlinx.coroutines.MainScope().launch {
                     val res = ApiClient.authApi.forgotPassword(ForgotRequest(email.trim()))
@@ -473,35 +515,35 @@ private fun ForgotForm(onModeChange: (AuthMode) -> Unit) {
                         Analytics.passwordResetRequested()
                         step = 1
                         info = res.body()!!.message
-                            ?: "أرسلنا رمز تحقق مكونًا من 6 أرقام إلى بريدك الإلكتروني، صالح لمدة 15 دقيقة."
+                            ?: S.sentCodeTo("")
                     } else error = errorMessage(res)
                 }
             })
         } else {
-            AuthTextField(code, { code = it }, "رمز التحقق (6 أرقام)", Icons.Filled.Lock,
+            AuthTextField(code, { code = it }, S.otpCode, Icons.Filled.Lock,
                 keyboardType = androidx.compose.ui.text.input.KeyboardType.NumberPassword)
-            AuthTextField(newPass, { newPass = it }, "كلمة السر الجديدة", Icons.Filled.Lock, isPassword = true)
-            AuthTextField(confirm, { confirm = it }, "تأكيد كلمة السر", Icons.Filled.Lock, isPassword = true)
-            GradientButton(text = "تعيين كلمة السر", loading = loading, onClick = {
-                if (code.isBlank()) { error = "أدخل رمز التحقق الذي وصلك بالبريد"; return@GradientButton }
-                if (newPass != confirm) { error = "كلمتا السر غير متطابقتين"; return@GradientButton }
+            AuthTextField(newPass, { newPass = it }, S.newPassword, Icons.Filled.Lock, isPassword = true)
+            AuthTextField(confirm, { confirm = it }, S.confirmPassword, Icons.Filled.Lock, isPassword = true)
+            GradientButton(text = S.setPassword, loading = loading, onClick = {
+                if (code.isBlank()) { error = S.enterOtp; return@GradientButton }
+                if (newPass != confirm) { error = S.passwordMismatch; return@GradientButton }
                 loading = true; error = null
                 kotlinx.coroutines.MainScope().launch {
                     val res = ApiClient.authApi.resetPassword(ResetRequest(code.trim(), newPass))
                     loading = false
                     if (res.isSuccessful) {
-                        info = "تم تغيير كلمة السر بنجاح، يمكنك تسجيل الدخول الآن."
+                        info = S.resetDone
                         step = 0
                         code = ""; newPass = ""; confirm = ""
                     } else error = errorMessage(res)
                 }
             })
             TextButton(onClick = { step = 0; info = null; error = null }) {
-                Text("إعادة إرسال الرمز / تغيير البريد", color = Accent)
+                Text(S.resendChangeEmail, color = Accent)
             }
         }
         TextButton(onClick = { onModeChange(AuthMode.Login) }) {
-            Text("العودة لتسجيل الدخول", color = Accent)
+            Text(S.backToLogin, color = Accent)
         }
     }
 }
@@ -524,7 +566,7 @@ private fun VerifyForm(onModeChange: (AuthMode) -> Unit, onAuthenticated: (AuthR
             }
         }
         Text(
-            "أرسلنا رمز تحقق مكوّنًا من 6 أرقام إلى بريدك الإلكتروني (${pending.user.email})، صالح لمدة 15 دقيقة.",
+            S.sentCodeTo(pending.user.email),
             color = Color.White.copy(alpha = 0.85f),
             fontSize = 14.sp,
             textAlign = TextAlign.Start,
@@ -533,12 +575,12 @@ private fun VerifyForm(onModeChange: (AuthMode) -> Unit, onAuthenticated: (AuthR
         // When no email provider (RESEND_API_KEY) is configured, the backend returns the code
         // directly for testing — surface it here so verification can be completed.
         pending.dev_code?.let {
-            info = "وضع الاختبار: رمز التحقق الخاص بك هو $it"
+            info = "${S.devModeCode} $it"
         }
-        AuthTextField(code, { code = it }, "رمز التحقق (6 أرقام)", Icons.Filled.Lock,
+        AuthTextField(code, { code = it }, S.otpCode, Icons.Filled.Lock,
             keyboardType = androidx.compose.ui.text.input.KeyboardType.NumberPassword)
-        GradientButton(text = "تأكيد الحساب والدخول", loading = loading, onClick = {
-            if (code.length != 6) { error = "أدخل الرمز المكون من 6 أرقام"; return@GradientButton }
+        GradientButton(text = S.confirmAccount, loading = loading, onClick = {
+            if (code.length != 6) { error = S.enterOtp6; return@GradientButton }
             loading = true; error = null
             kotlinx.coroutines.MainScope().launch {
                 val res = ApiClient.authApi.verifyEmail(
@@ -552,19 +594,19 @@ private fun VerifyForm(onModeChange: (AuthMode) -> Unit, onAuthenticated: (AuthR
                 } else error = errorMessage(res)
             }
         })
-        OutlineButton(text = "إعادة إرسال الرمز", enabled = !loading, onClick = {
+        OutlineButton(text = S.resendCode, enabled = !loading, onClick = {
             kotlinx.coroutines.MainScope().launch {
                 runCatching {
                     ApiClient.authApi.resendVerification("Bearer ${'$'}{pending.tokens.accessToken}")
                 }
-                info = "تم إرسال رمز جديد إلى بريدك الإلكتروني."
+                info = S.sentNewCode
             }
         })
         TextButton(onClick = {
             pendingVerify = null
             onModeChange(AuthMode.Login)
         }) {
-            Text("العودة لتسجيل الدخول", color = Accent)
+            Text(S.backToLogin, color = Accent)
         }
     }
 }
@@ -596,7 +638,7 @@ fun GoogleSignInButton(
             loading = false
             GoogleSignInHelper.finishSignIn(activity, data).fold(
                 onSuccess = { onAuthenticated(it) },
-                onFailure = { onError(it.message ?: "فشل تسجيل الدخول بحساب Google") },
+                onFailure = { onError(it.message ?: tap.win.app.ui.S.googleFail) },
             )
         }
     }
@@ -639,7 +681,7 @@ fun GoogleSignInButton(
                 modifier = Modifier.size(20.dp),
             )
             Spacer(Modifier.width(10.dp))
-            Text("المتابعة باستخدام حساب Google", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+            Text(tap.win.app.ui.S.continueGoogle, fontWeight = FontWeight.Bold, fontSize = 15.sp)
         }
     }
 }

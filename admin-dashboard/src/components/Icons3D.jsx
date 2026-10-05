@@ -17,7 +17,7 @@ const shapeDefs = (uid, c1, c2) => (
 
 let counter = 0;
 
-export function Icon3D({ size = 26, c1 = '#a78bfa', c2 = '#6d5dfc', children, style }) {
+export function Icon3D({ size = 26, c1 = '#a78bfa', c2 = '#ffffff', children, style }) {
   const uid = `i${++counter}`;
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={style} aria-hidden="true">
@@ -68,7 +68,7 @@ const P = {
 };
 
 /**
- * Usage: <Icon name="users" size={24} c1="#818cf8" c2="#6d5dfc" />
+ * Usage: <Icon name="users" size={24} c1="#818cf8" c2="#ffffff" />
  */
 export default function Icon({ name, ...rest }) {
   return <Icon3D {...rest}>{P[name]}</Icon3D>;

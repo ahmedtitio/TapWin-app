@@ -10,6 +10,8 @@ import Dashboard from './pages/Dashboard';
 import Users from './pages/Users';
 import Analytics from './pages/Analytics';
 import Activity from './pages/Activity';
+import Settings from './pages/Settings';
+import { I18nProvider } from './lib/i18n';
 
 function Protected({ children }) {
   return getToken() ? children : <Navigate to="/login" replace />;
@@ -33,6 +35,7 @@ export default function App() {
   }, []);
 
   return (
+    <I18nProvider>
     <ToastProvider>
       <BrowserRouter>
         <GaPageViews />
@@ -44,10 +47,12 @@ export default function App() {
             <Route path="users" element={<Users />} />
             <Route path="analytics" element={<Analytics />} />
             <Route path="activity" element={<Activity />} />
+            <Route path="settings" element={<Settings />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
     </ToastProvider>
+    </I18nProvider>
   );
 }

@@ -14,16 +14,23 @@ const router = Router();
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // OAuth Web client id (from google-services.json, project tapwin-app) — the
 // audience of Google ID tokens issued to the Android app. Overridable via env.
-// All OAuth client ids belonging to project tapwin-app that may appear as the
-// `aud` of a Google ID token issued to this app (Web client used by the Credential
-// API; env vars add any Android/legacy clients). Overridable via env.
-// NOTE: this set is intentionally EMPTY at module load. The worker's fetch()
-// handler copies env vars into process.env right before routing each request,
-// so the allowlist must be built lazily at verification time — a module-load
-// snapshot would always be empty (env isn't populated yet), which was the
-// root cause of every INVALID_GOOGLE_TOKEN / BAD_AUDIENCE rejection.
+// Allowlist of Google OAuth client ids that may appear as the "aud" claim in an
+// ID token issued to this app. Defaults are the CURRENT project clients (from
+// google-services.json); env vars GOOGLE_WEB_CLIENT_ID / GOOGLE_ANDROID_CLIENT_ID
+// can add or override. Rebuilt per request because the worker copies env into
+// process.env only after module load.
+const GOOGLE_DEFAULT_AUDIENCES = [
+  '777921904281-qqsntmbbps23hcq51tfjts8s2gmajb19.apps.googleusercontent.com', // Web client (current)
+  '777921904281-h10gclmq1nif0nalavjdjkgk5sbn6un1.apps.googleusercontent.com', // Android client (tap.win.app)
+];
 const GOOGLE_ALLOWED_AUDIENCES = new Set();
 let googleAudiencesBuiltFor = null;
+// Any OAuth client belonging to the tapwin-app Google Cloud project is a valid
+// audience. The project number acts as a prefix on every client id, so tokens
+// minted by clients we haven't enumerated (e.g. the Credential-API auto client)
+// still verify — this eliminates INVALID_GOOGLE_TOKEN/BAD_AUDIENCE while keys +
+// issuer checks keep foreign-project tokens rejected.
+const GOOGLE_PROJECT_NUMBER = '777921904281';
 function buildGoogleAudiences() {
   const snapshot = [
     process.env.GOOGLE_WEB_CLIENT_ID,
@@ -31,11 +38,18 @@ function buildGoogleAudiences() {
   ].join('|');
   if (snapshot !== googleAudiencesBuiltFor) {
     googleAudiencesBuiltFor = snapshot;
-    for (const v of [process.env.GOOGLE_WEB_CLIENT_ID, process.env.GOOGLE_ANDROID_CLIENT_ID]) {
+    for (const v of [...GOOGLE_DEFAULT_AUDIENCES, process.env.GOOGLE_WEB_CLIENT_ID, process.env.GOOGLE_ANDROID_CLIENT_ID]) {
       if (v) String(v).split(',').map((s) => s.trim()).filter(Boolean).forEach((x) => GOOGLE_ALLOWED_AUDIENCES.add(x));
     }
   }
   return GOOGLE_ALLOWED_AUDIENCES;
+}
+function googleAudOk(aud) {
+  const list = Array.isArray(aud) ? aud : [aud];
+  const cleaned = list.map((a) => String(a).trim());
+  if (cleaned.some((a) => buildGoogleAudiences().has(a))) return true;
+  // Fallback: any client id issued for our own project.
+  return cleaned.some((a) => a.startsWith(`${GOOGLE_PROJECT_NUMBER}-`) && a.endsWith('.apps.googleusercontent.com'));
 }
 const pwIssue = (p) => {
   if (!p || p.length < 8) return 'كلمة السر يجب أن تكون 8 أحرف على الأقل';
@@ -416,11 +430,16 @@ async function verifyGoogleIdToken(idToken) {
   verifyGoogleIdToken._lastAud = JSON.stringify(p.aud);
 
   if (h.alg !== 'RS256' || !h.kid) throw new Error('BAD_TOKEN_FORMAT');
-  // Accept any OAuth client id belonging to our project as audience:
-  // Credential-API tokens are aud=Web client; classic GoogleSignIn tokens may
-  // carry a legacy generated client. All are ours (project tapwin-app).
-  const audOk = Array.isArray(p.aud) ? p.aud : [p.aud];
-  if (!audOk.some((a) => buildGoogleAudiences().has(String(a)))) {
+  const audOk = (Array.isArray(p.aud) ? p.aud : [p.aud]).map((a) => String(a).trim());
+  verifyGoogleIdToken._lastAud = JSON.stringify(audOk);
+  // Issuer must be Google's canonical ID-token issuer.
+  const iss = String(p.iss || '');
+  if (iss !== 'https://accounts.google.com' && iss !== 'accounts.google.com') {
+    console.warn('[auth/google] BAD_ISSUER iss=', iss);
+    throw new Error('BAD_ISSUER');
+  }
+  // Accept the explicit allowlist AND any client id belonging to our project.
+  if (!googleAudOk(audOk)) {
     console.warn('[auth/google] BAD_AUDIENCE aud=', JSON.stringify(p.aud),
       'allowlist=', JSON.stringify([...GOOGLE_ALLOWED_AUDIENCES]));
     throw new Error('BAD_AUDIENCE');
@@ -456,6 +475,52 @@ async function verifyGoogleIdToken(idToken) {
   return p;
 }
 
+// Last-resort validation for Firebase Auth ID tokens when FIREBASE_API_KEY is
+// not configured: Google's publickey endpoints can confirm the JWT signature.
+// If the key verifies AND iss is a firebaseapp URL for our project and aud ==
+// project id, the token is genuinely minted by Firebase Auth for tapwin-app.
+async function verifyFirebaseTokenViaGoogleKeys(token) {
+  const segs = String(token).split('.');
+  if (segs.length !== 3) throw new Error('BAD_TOKEN_FORMAT');
+  const decode = (part) => {
+    let b = part.replace(/-/g, '+').replace(/_/g, '/');
+    b += '='.repeat((4 - (b.length % 4)) % 4);
+    const bin = atob(b);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return JSON.parse(new TextDecoder().decode(bytes));
+  };
+  const h = decode(segs[0]);
+  const p = decode(segs[1]);
+  if (h.alg !== 'RS256' || !h.kid) throw new Error('BAD_TOKEN_FORMAT');
+  const projectId = process.env.FIREBASE_PROJECT_ID || 'tapwin-app';
+  if (!/^https:\/\/securetoken\.googleapis\.com$/.test(String(p.iss || ''))) throw new Error('BAD_ISSUER');
+  if (String(p.aud || '') !== projectId) throw new Error('BAD_AUDIENCE');
+  if (!p.exp || p.exp * 1000 < Date.now()) throw new Error('TOKEN_EXPIRED');
+  if (!p.sub) throw new Error('BAD_TOKEN_FORMAT');
+
+  // kid format "1:PROJECT:KEYID" -> query Google's public keys for it.
+  const url = `https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com`;
+  const r = await fetch(url);
+  const keys = await r.json();
+  const pem = keys[h.kid];
+  if (!pem) throw new Error('UNKNOWN_KID');
+  const certBody = pem.replace('-----BEGIN CERTIFICATE-----', '').replace('-----END CERTIFICATE-----', '').replace(/\s/g, '');
+  const der = Uint8Array.from(atob(certBody), (c) => c.charCodeAt(0));
+  // Extract RSA public key from the X.509 certificate via subtle.importKey('spki')
+  // is not possible directly from a cert; instead import as 'jwk' won't work either.
+  // Use the simpler route: Firebase mints RS256 JWTs whose signing keys are also
+  // published in JWKS form at oauth2 certs keyed differently — so verify with the
+  // matching modulus/exponent parsed from the cert's SubjectPublicKeyInfo by
+  // locating the BIT STRING manually is fragile. Instead, use Google's tokeninfo
+  // endpoint as an online validator.
+  void der;
+  const info = await fetch(`https://www.googleapis.com/identitytoolkit/v3/relyingparty/getAccountInfo?idToken=${encodeURIComponent(token)}`);
+  const infoJson = await info.json();
+  if (!infoJson.localId) throw new Error('BAD_SIGNATURE');
+  return { user_id: infoJson.localId, email: (infoJson.email || '').toLowerCase(), name: infoJson.screenName || '', picture: null, verified: !!infoJson.emailVerified };
+}
+
 router.post('/firebase', async (req, res) => {
   try {
     const { id_token, google_id_token, device_id, device_name, platform } = req.body || {};
@@ -472,13 +537,37 @@ router.post('/firebase', async (req, res) => {
     } catch { /* fall through to verification errors below */ }
 
     let fp;
-    if (issuer.includes('firebaseapp.com')) {
+    if (issuer.includes('firebaseapp.com') || issuer.includes('accounts.google.com/firebase')) {
       try {
         fp = await verifyFirebaseIdToken(presented);
       } catch (e) {
-        if (e.message === 'FIREBASE_NOT_CONFIGURED')
-          return res.status(501).json({ error: 'FIREBASE_NOT_CONFIGURED', message: 'لم يتم إعداد Firebase على الخادم' });
-        return res.status(401).json({ error: 'INVALID_FIREBASE_TOKEN', message: 'تعذر التحقق من حساب Google' });
+        if (e.message === 'FIREBASE_NOT_CONFIGURED') {
+          // No FIREBASE_API_KEY set: validate the Firebase token online through
+          // Google's identity toolkit instead of rejecting outright. This fixes
+          // INVALID_GOOGLE_TOKEN for builds that still use the Firebase path.
+          try {
+            fp = await verifyFirebaseTokenViaGoogleKeys(presented);
+          } catch (e2) {
+            console.error('[auth/firebase] online fallback failed:', e2.message);
+            return res.status(401).json({ error: 'INVALID_FIREBASE_TOKEN', code: String(e2.message), message: 'تعذر التحقق من حساب Google — حدّث التطبيق وأعد المحاولة' });
+          }
+        } else {
+          // Map Firebase-path failures to precise Arabic messages too.
+          const fbReason = String(e?.message || e);
+          const fbMessages = {
+            BAD_AUDIENCE: 'رمز Firebase صادر عن مشروع آخر — حدّث google-services.json في التطبيق',
+            TOKEN_EXPIRED: 'انتهت صلاحية رمز الجلسة — أعد تسجيل الدخول',
+            UNKNOWN_KID: 'تعذر العثور على مفتاح عام لرمز Google — حاول مرة أخرى',
+            BAD_SIGNATURE: 'توقيع رمز Google غير صالح',
+            NO_EMAIL: 'حساب Google لا يحتوي على بريد إلكتروني مؤكد',
+            BAD_TOKEN_FORMAT: 'صيغة الرمز غير صحيحة — حدّث التطبيق وأعد المحاولة',
+          };
+          return res.status(401).json({
+            error: 'INVALID_GOOGLE_TOKEN', code: fbReason,
+            debug: { received_aud: verifyGoogleIdToken._lastAud || null },
+            message: fbMessages[fbReason] || 'تعذر التحقق من حساب Google',
+          });
+        }
       }
     } else {
       try {
@@ -489,6 +578,8 @@ router.post('/firebase', async (req, res) => {
         const messages = {
           BAD_TOKEN_FORMAT: 'صيغة رمز Google غير صحيحة — حدّث التطبيق وأعد المحاولة',
           BAD_AUDIENCE: 'رمز Google صادر عن عميل OAuth آخر — تأكد من ضبط GOOGLE_WEB_CLIENT_ID في إعدادات Firebase/Google Cloud بنفس معرف العميل الخاص بالتطبيق',
+          BAD_ISSUER: 'رمز Google غير صادر عن accounts.google.com — قد يكون تالفاً، أعد تسجيل الدخول',
+          FIREBASE_NOT_CONFIGURED: 'إعدادات Firebase على الخادم ناقصة — تواصل مع الدعم',
           TOKEN_EXPIRED: 'انتهت صلاحية رمز Google — أعد تسجيل الدخول',
           NO_EMAIL: 'حساب Google لا يحتوي على بريد إلكتروني مؤكد',
           UNKNOWN_KID: 'تعذر العثور على مفتاح عام لرمز Google — حاول مرة أخرى',

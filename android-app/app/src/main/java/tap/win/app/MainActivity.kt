@@ -94,14 +94,21 @@ class MainActivity : ComponentActivity() {
         // exit cleanly instead of the system "app keeps stopping" dialog.
         try {
             setContent {
+                // Monochrome theme: black background, white text, glass surfaces.
                 MaterialTheme(
                     colorScheme = darkColorScheme(
-                        primary = Color(0xFF6C4DF6),
-                        secondary = Color(0xFF00D4AA),
-                        background = Color(0xFF120B33),
-                        surface = Color(0xFF1D1445),
+                        primary = Color.White,
+                        onPrimary = Color.Black,
+                        secondary = Color.White,
+                        onSecondary = Color.Black,
+                        background = Color.Black,
                         onBackground = Color.White,
+                        surface = Color(0xFF141414),
                         onSurface = Color.White,
+                        surfaceVariant = Color(0xFF1A1A1A),
+                        onSurfaceVariant = Color.White.copy(alpha = 0.7f),
+                        outline = Color.White.copy(alpha = 0.25f),
+                        error = Color(0xFFFFB4C0),
                     ),
                     typography = Typography(),
                 ) {
@@ -140,7 +147,7 @@ private fun SessionSplash() {
     val scale = 0.92f + 0.08f * pulseValue.value
 
     Surface(
-        color = Color(0xFF120B33),
+        color = Color.Black,
         modifier = Modifier.fillMaxSize(),
     ) {
         Box(
@@ -165,21 +172,21 @@ private fun SessionSplash() {
                 )
                 Spacer(Modifier.height(14.dp))
                 Text(
-                    "Tap Win",
+                    tap.win.app.ui.S.t("Tap Win", "Tap Win"),
                     color = Color.White,
                     fontWeight = FontWeight.ExtraBold,
                     fontSize = 26.sp,
                 )
                 Spacer(Modifier.height(24.dp))
                 CircularProgressIndicator(
-                    color = Color(0xFF6C4DF6),
+                    color = Color.White,
                     trackColor = Color.White.copy(alpha = 0.15f),
                     strokeWidth = 3.dp,
                     modifier = Modifier.size(30.dp),
                 )
                 Spacer(Modifier.height(14.dp))
                 Text(
-                    "جارٍ استعادة جلستك…",
+                    tap.win.app.ui.S.restoringSession,
                     color = Color.White.copy(alpha = 0.75f),
                     fontSize = 14.sp,
                 )
