@@ -18,3 +18,7 @@ enabled = true
 # Firebase Google sign-in: set your Firebase project id (used to verify ID tokens)
 [vars]
 FIREBASE_PROJECT_ID = "tapwin-app"
+# Google OAuth client ids accepted as `aud` of app-issued ID tokens.
+# Keep in sync with android-app/gradle.properties + codemagic.yaml.
+GOOGLE_WEB_CLIENT_ID = "777921904281-qqsntmbbps23hcq51tfjts8s2gmajb19.apps.googleusercontent.com"
+GOOGLE_ANDROID_CLIENT_ID = "777921904281-h10gclmq1nif0nalavjdjkgk5sbn6un1.apps.googleusercontent.com"
