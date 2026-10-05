@@ -33,6 +33,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -109,9 +110,25 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/** Small centered splash shown while a saved session is being restored. */
+/** Branded splash shown while a saved session is being restored. */
 @androidx.compose.runtime.Composable
 private fun SessionSplash() {
+    // Gentle pulse for the logo + indeterminate loader while refresh runs.
+    val pulse = androidx.compose.animation.core.rememberAnimatable(0f)
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        while (true) {
+            pulse.animateTo(
+                targetValue = 1f,
+                animationSpec = androidx.compose.animation.core.tween(durationMillis = 1100),
+            )
+            pulse.animateTo(
+                targetValue = 0f,
+                animationSpec = androidx.compose.animation.core.tween(durationMillis = 1100),
+            )
+        }
+    }
+    val scale = 0.92f + 0.08f * pulse.value
+
     Surface(
         color = Color(0xFF120B33),
         modifier = Modifier.fillMaxSize(),
@@ -124,21 +141,36 @@ private fun SessionSplash() {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
-                // App name text instead of the launcher mipmap: adaptive-icon
-                // mipmaps are not guaranteed to be loadable as a Painter on all
-                // devices/SDKs and used to throw Resources$NotFoundException.
+                // App logo: plain vector drawable (never a mipmap painter — those
+                // threw Resources$NotFoundException on some devices).
+                Image(
+                    painter = painterResource(id = tap.win.app.R.drawable.ic_app_logo),
+                    contentDescription = "Tap Win",
+                    modifier = Modifier
+                        .size(96.dp)
+                        .graphicsLayer {
+                            scaleX = scale
+                            scaleY = scale
+                        },
+                )
+                Spacer(Modifier.height(14.dp))
                 Text(
                     "Tap Win",
                     color = Color.White,
                     fontWeight = FontWeight.ExtraBold,
-                    fontSize = 28.sp,
+                    fontSize = 26.sp,
                 )
-                Spacer(Modifier.height(16.dp))
-                CircularProgressIndicator(color = Color(0xFF6C4DF6), strokeWidth = 3.dp)
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(24.dp))
+                CircularProgressIndicator(
+                    color = Color(0xFF6C4DF6),
+                    trackColor = Color.White.copy(alpha = 0.15f),
+                    strokeWidth = 3.dp,
+                    modifier = Modifier.size(30.dp),
+                )
+                Spacer(Modifier.height(14.dp))
                 Text(
                     "جارٍ استعادة جلستك…",
-                    color = Color.White.copy(alpha = 0.8f),
+                    color = Color.White.copy(alpha = 0.75f),
                     fontSize = 14.sp,
                 )
             }
