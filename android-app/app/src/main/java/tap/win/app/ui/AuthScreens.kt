@@ -245,7 +245,7 @@ fun GoogleGradientButton(
             }
             Spacer(Modifier.width(12.dp))
             Text(
-                tap.win.app.ui.S.continueGoogle,
+                tap.win.app.ui.S.continueGoogle(),
                 fontWeight = FontWeight.Bold,
                 fontSize = 15.sp,
                 color = Color(0xFF1F1F1F),
@@ -278,9 +278,9 @@ fun errorMessage(raw: Response<*>): String {
         raw.errorBody()?.let { body ->
             val gson = com.google.gson.Gson()
             val err = gson.fromJson(body.charStream(), ApiError::class.java)
-            err.message ?: tap.win.app.ui.S.genericError
-        } ?: tap.win.app.ui.S.serverUnreachable
-    }.getOrDefault(tap.win.app.ui.S.serverUnreachable)
+            err.message ?: tap.win.app.ui.S.genericError()
+        } ?: tap.win.app.ui.S.serverUnreachable()
+    }.getOrDefault(tap.win.app.ui.S.serverUnreachable())
 }
 
 sealed class AuthMode { object Login : AuthMode(); object Register : AuthMode(); object Forgot : AuthMode(); object Verify : AuthMode() }
@@ -316,7 +316,7 @@ fun AuthScreen(
         // Now that a session exists, upload the FCM push token for this device.
         TapWinMessagingService.register(appCtx)
         if (resp.isNewUser) {
-            android.widget.Toast.makeText(activity, S.googleWelcome,
+            android.widget.Toast.makeText(activity, S.googleWelcome(),
                 android.widget.Toast.LENGTH_LONG).show()
         }
         onAuthenticated(resp)
@@ -339,22 +339,22 @@ fun AuthScreen(
             Spacer(Modifier.height(48.dp))
             Image(
                 painter = painterResource(id = R.drawable.ic_app_logo),
-                contentDescription = S.appName,
+                contentDescription = S.appName(),
                 modifier = Modifier.size(96.dp),
             )
             Spacer(Modifier.height(16.dp))
             Text(
-                S.appName,
+                S.appName(),
                 style = MaterialTheme.typography.headlineMedium,
                 color = Color.White,
                 fontWeight = FontWeight.ExtraBold,
             )
             Text(
                 when (mode) {
-                    AuthMode.Login -> S.loginTitle
-                    AuthMode.Register -> S.registerTitle
-                    AuthMode.Forgot -> S.forgotTitle
-                    AuthMode.Verify -> S.verifyTitle
+                    AuthMode.Login -> S.loginTitle()
+                    AuthMode.Register -> S.registerTitle()
+                    AuthMode.Forgot -> S.forgotTitle()
+                    AuthMode.Verify -> S.verifyTitle()
                 },
                 color = Color.White.copy(alpha = 0.6f),
             )
@@ -381,15 +381,15 @@ private fun LoginForm(onModeChange: (AuthMode) -> Unit, onAuthenticated: (AuthRe
 
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         error?.let { ErrorMessage(it); Spacer(Modifier.height(2.dp)) }
-        AuthTextField(email, { email = it }, S.email, Icons.Filled.MailOutline,
+        AuthTextField(email, { email = it }, S.email(), Icons.Filled.MailOutline,
             keyboardType = androidx.compose.ui.text.input.KeyboardType.Email)
-        AuthTextField(password, { password = it }, S.password, Icons.Filled.Lock, isPassword = true)
+        AuthTextField(password, { password = it }, S.password(), Icons.Filled.Lock, isPassword = true)
 
         TextButton(onClick = { onModeChange(AuthMode.Forgot) }) {
-            Text(S.forgotPassword, color = Accent)
+            Text(S.forgotPassword(), color = Accent)
         }
 
-        GradientButton(text = S.signIn, loading = loading, onClick = {
+        GradientButton(text = S.signIn(), loading = loading, onClick = {
             loading = true; error = null
             kotlinx.coroutines.MainScope().launch {
                 val res = ApiClient.authApi.login(
@@ -405,7 +405,7 @@ private fun LoginForm(onModeChange: (AuthMode) -> Unit, onAuthenticated: (AuthRe
                         onModeChange(AuthMode.Verify)
                     } else {
                         android.widget.Toast.makeText(ctx,
-                            S.welcomeBack, android.widget.Toast.LENGTH_SHORT).show()
+                            S.welcomeBack(), android.widget.Toast.LENGTH_SHORT).show()
                         onAuthenticated(body)
                     }
                 } else error = errorMessage(res)
@@ -413,9 +413,9 @@ private fun LoginForm(onModeChange: (AuthMode) -> Unit, onAuthenticated: (AuthRe
         })
         GoogleSignInButton(onAuthenticated = onAuthenticated, onError = { error = it })
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-            Text(S.noAccount, color = Color.White.copy(alpha = 0.6f))
+            Text(S.noAccount(), color = Color.White.copy(alpha = 0.6f))
             TextButton(onClick = { onModeChange(AuthMode.Register) }) {
-                Text(S.createAccount, color = Brand, fontWeight = FontWeight.Bold)
+                Text(S.createAccount(), color = Brand, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -438,16 +438,16 @@ private fun RegisterForm(onModeChange: (AuthMode) -> Unit, onAuthenticated: (Aut
 
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         error?.let { ErrorMessage(it) }
-        AuthTextField(name, { name = it }, S.fullName, Icons.Filled.Person)
-        AuthTextField(username, { username = it }, S.username, Icons.Filled.Person)
-        AuthTextField(email, { email = it }, S.email, Icons.Filled.MailOutline,
+        AuthTextField(name, { name = it }, S.fullName(), Icons.Filled.Person)
+        AuthTextField(username, { username = it }, S.username(), Icons.Filled.Person)
+        AuthTextField(email, { email = it }, S.email(), Icons.Filled.MailOutline,
             keyboardType = androidx.compose.ui.text.input.KeyboardType.Email)
-        AuthTextField(phone, { phone = it }, S.phoneOptional, Icons.Filled.Phone,
+        AuthTextField(phone, { phone = it }, S.phoneOptional(), Icons.Filled.Phone,
             keyboardType = androidx.compose.ui.text.input.KeyboardType.Phone)
-        AuthTextField(password, { password = it }, S.password, Icons.Filled.Lock, isPassword = true)
-        AuthTextField(confirm, { confirm = it }, S.confirmPassword, Icons.Filled.Lock, isPassword = true)
+        AuthTextField(password, { password = it }, S.password(), Icons.Filled.Lock, isPassword = true)
+        AuthTextField(confirm, { confirm = it }, S.confirmPassword(), Icons.Filled.Lock, isPassword = true)
 
-        GradientButton(text = S.signUp, loading = loading, onClick = {
+        GradientButton(text = S.signUp(), loading = loading, onClick = {
             if (password == confirm) {
             loading = true; error = null
             kotlinx.coroutines.MainScope().launch {
@@ -465,20 +465,20 @@ private fun RegisterForm(onModeChange: (AuthMode) -> Unit, onAuthenticated: (Aut
                 loading = false
                 if (res.isSuccessful && res.body() != null) {
                     Analytics.register()
-                    android.widget.Toast.makeText(ctx, S.accountCreated,
+                    android.widget.Toast.makeText(ctx, S.accountCreated(),
                         android.widget.Toast.LENGTH_SHORT).show()
                     // New accounts must confirm the emailed code before entering the dashboard.
                     pendingVerify = res.body()!!
                     onModeChange(AuthMode.Verify)
                 } else error = errorMessage(res)
             }
-            } else error = S.passwordMismatch
+            } else error = S.passwordMismatch()
         })
         GoogleSignInButton(onAuthenticated = onAuthenticated, onError = { error = it })
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-            Text(S.haveAccount, color = Color.White.copy(alpha = 0.6f))
+            Text(S.haveAccount(), color = Color.White.copy(alpha = 0.6f))
             TextButton(onClick = { onModeChange(AuthMode.Login) }) {
-                Text(S.signIn, color = Brand, fontWeight = FontWeight.Bold)
+                Text(S.signIn(), color = Brand, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -504,9 +504,9 @@ private fun ForgotForm(onModeChange: (AuthMode) -> Unit) {
             }
         }
         if (step == 0) {
-            AuthTextField(email, { email = it }, S.email, Icons.Filled.MailOutline,
+            AuthTextField(email, { email = it }, S.email(), Icons.Filled.MailOutline,
                 keyboardType = androidx.compose.ui.text.input.KeyboardType.Email)
-            GradientButton(text = S.sendCode, loading = loading, onClick = {
+            GradientButton(text = S.sendCode(), loading = loading, onClick = {
                 loading = true; error = null; info = null
                 kotlinx.coroutines.MainScope().launch {
                     val res = ApiClient.authApi.forgotPassword(ForgotRequest(email.trim()))
@@ -520,30 +520,30 @@ private fun ForgotForm(onModeChange: (AuthMode) -> Unit) {
                 }
             })
         } else {
-            AuthTextField(code, { code = it }, S.otpCode, Icons.Filled.Lock,
+            AuthTextField(code, { code = it }, S.otpCode(), Icons.Filled.Lock,
                 keyboardType = androidx.compose.ui.text.input.KeyboardType.NumberPassword)
-            AuthTextField(newPass, { newPass = it }, S.newPassword, Icons.Filled.Lock, isPassword = true)
-            AuthTextField(confirm, { confirm = it }, S.confirmPassword, Icons.Filled.Lock, isPassword = true)
-            GradientButton(text = S.setPassword, loading = loading, onClick = {
-                if (code.isBlank()) { error = S.enterOtp; return@GradientButton }
-                if (newPass != confirm) { error = S.passwordMismatch; return@GradientButton }
+            AuthTextField(newPass, { newPass = it }, S.newPassword(), Icons.Filled.Lock, isPassword = true)
+            AuthTextField(confirm, { confirm = it }, S.confirmPassword(), Icons.Filled.Lock, isPassword = true)
+            GradientButton(text = S.setPassword(), loading = loading, onClick = {
+                if (code.isBlank()) { error = S.enterOtp(); return@GradientButton }
+                if (newPass != confirm) { error = S.passwordMismatch(); return@GradientButton }
                 loading = true; error = null
                 kotlinx.coroutines.MainScope().launch {
                     val res = ApiClient.authApi.resetPassword(ResetRequest(code.trim(), newPass))
                     loading = false
                     if (res.isSuccessful) {
-                        info = S.resetDone
+                        info = S.resetDone()
                         step = 0
                         code = ""; newPass = ""; confirm = ""
                     } else error = errorMessage(res)
                 }
             })
             TextButton(onClick = { step = 0; info = null; error = null }) {
-                Text(S.resendChangeEmail, color = Accent)
+                Text(S.resendChangeEmail(), color = Accent)
             }
         }
         TextButton(onClick = { onModeChange(AuthMode.Login) }) {
-            Text(S.backToLogin, color = Accent)
+            Text(S.backToLogin(), color = Accent)
         }
     }
 }
@@ -575,12 +575,12 @@ private fun VerifyForm(onModeChange: (AuthMode) -> Unit, onAuthenticated: (AuthR
         // When no email provider (RESEND_API_KEY) is configured, the backend returns the code
         // directly for testing — surface it here so verification can be completed.
         pending.dev_code?.let {
-            info = "${S.devModeCode} $it"
+            info = "${S.devModeCode()} $it"
         }
-        AuthTextField(code, { code = it }, S.otpCode, Icons.Filled.Lock,
+        AuthTextField(code, { code = it }, S.otpCode(), Icons.Filled.Lock,
             keyboardType = androidx.compose.ui.text.input.KeyboardType.NumberPassword)
-        GradientButton(text = S.confirmAccount, loading = loading, onClick = {
-            if (code.length != 6) { error = S.enterOtp6; return@GradientButton }
+        GradientButton(text = S.confirmAccount(), loading = loading, onClick = {
+            if (code.length != 6) { error = S.enterOtp6(); return@GradientButton }
             loading = true; error = null
             kotlinx.coroutines.MainScope().launch {
                 val res = ApiClient.authApi.verifyEmail(
@@ -594,19 +594,19 @@ private fun VerifyForm(onModeChange: (AuthMode) -> Unit, onAuthenticated: (AuthR
                 } else error = errorMessage(res)
             }
         })
-        OutlineButton(text = S.resendCode, enabled = !loading, onClick = {
+        OutlineButton(text = S.resendCode(), enabled = !loading, onClick = {
             kotlinx.coroutines.MainScope().launch {
                 runCatching {
                     ApiClient.authApi.resendVerification("Bearer ${'$'}{pending.tokens.accessToken}")
                 }
-                info = S.sentNewCode
+                info = S.sentNewCode()
             }
         })
         TextButton(onClick = {
             pendingVerify = null
             onModeChange(AuthMode.Login)
         }) {
-            Text(S.backToLogin, color = Accent)
+            Text(S.backToLogin(), color = Accent)
         }
     }
 }
@@ -638,7 +638,7 @@ fun GoogleSignInButton(
             loading = false
             GoogleSignInHelper.finishSignIn(activity, data).fold(
                 onSuccess = { onAuthenticated(it) },
-                onFailure = { onError(it.message ?: tap.win.app.ui.S.googleFail) },
+                onFailure = { onError(it.message ?: tap.win.app.ui.S.googleFail()) },
             )
         }
     }
@@ -681,7 +681,7 @@ fun GoogleSignInButton(
                 modifier = Modifier.size(20.dp),
             )
             Spacer(Modifier.width(10.dp))
-            Text(tap.win.app.ui.S.continueGoogle, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+            Text(tap.win.app.ui.S.continueGoogle(), fontWeight = FontWeight.Bold, fontSize = 15.sp)
         }
     }
 }

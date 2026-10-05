@@ -73,11 +73,11 @@ fun HomeScreen(session: SessionStore, user: User, onLogout: () -> Unit) {
             topBar = {
                 TopAppBar(
                     title = {
-                        Text(tap.win.app.ui.S.appName, color = Color.White, fontWeight = FontWeight.Bold)
+                        Text(tap.win.app.ui.S.appName(), color = Color.White, fontWeight = FontWeight.Bold)
                     },
                     navigationIcon = {
                         IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                            Icon(Icons.Filled.Menu, contentDescription = tap.win.app.ui.S.menu, tint = Color.White)
+                            Icon(Icons.Filled.Menu, contentDescription = tap.win.app.ui.S.menu(), tint = Color.White)
                         }
                     },
                     actions = {
@@ -97,7 +97,7 @@ fun HomeScreen(session: SessionStore, user: User, onLogout: () -> Unit) {
                                 onLogout()
                             }
                         }) {
-                            Icon(Icons.Filled.ExitToApp, contentDescription = tap.win.app.ui.S.logout, tint = Color.White)
+                            Icon(Icons.Filled.ExitToApp, contentDescription = tap.win.app.ui.S.logout(), tint = Color.White)
                         }
                     },
                 )
@@ -110,7 +110,7 @@ fun HomeScreen(session: SessionStore, user: User, onLogout: () -> Unit) {
                     NavigationBarItem(
                         selected = tab == 0, onClick = { tab = 0 },
                         icon = { Icon(Icons.Filled.Home, contentDescription = null, tint = Color.White) },
-                        label = { Text(tap.win.app.ui.S.home, color = Color.White.copy(alpha = 0.7f)) },
+                        label = { Text(tap.win.app.ui.S.home(), color = Color.White.copy(alpha = 0.7f)) },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = Color.White,
                             selectedTextColor = Color.White,
@@ -120,7 +120,7 @@ fun HomeScreen(session: SessionStore, user: User, onLogout: () -> Unit) {
                     NavigationBarItem(
                         selected = tab == 1, onClick = { tab = 1 },
                         icon = { Icon(Icons.Filled.Person, contentDescription = null, tint = Color.White) },
-                        label = { Text(tap.win.app.ui.S.profile, color = Color.White.copy(alpha = 0.7f)) },
+                        label = { Text(tap.win.app.ui.S.profile(), color = Color.White.copy(alpha = 0.7f)) },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = Color.White,
                             selectedTextColor = Color.White,
@@ -130,7 +130,7 @@ fun HomeScreen(session: SessionStore, user: User, onLogout: () -> Unit) {
                     NavigationBarItem(
                         selected = tab == 2, onClick = { tab = 2 },
                         icon = { Icon(Icons.Filled.Lock, contentDescription = null, tint = Color.White) },
-                        label = { Text(tap.win.app.ui.S.security, color = Color.White.copy(alpha = 0.7f)) },
+                        label = { Text(tap.win.app.ui.S.security(), color = Color.White.copy(alpha = 0.7f)) },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = Color.White,
                             selectedTextColor = Color.White,
@@ -140,7 +140,7 @@ fun HomeScreen(session: SessionStore, user: User, onLogout: () -> Unit) {
                     NavigationBarItem(
                         selected = tab == 3, onClick = { tab = 3 },
                         icon = { Icon(Icons.Filled.Settings, contentDescription = null, tint = Color.White) },
-                        label = { Text(tap.win.app.ui.S.settings, color = Color.White.copy(alpha = 0.7f)) },
+                        label = { Text(tap.win.app.ui.S.settings(), color = Color.White.copy(alpha = 0.7f)) },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = Color.White,
                             selectedTextColor = Color.White,
@@ -162,21 +162,21 @@ fun HomeScreen(session: SessionStore, user: User, onLogout: () -> Unit) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Image(
                                     painter = painterResource(id = R.drawable.ic_app_logo),
-                                    contentDescription = tap.win.app.ui.S.appName,
+                                    contentDescription = tap.win.app.ui.S.appName(),
                                     modifier = Modifier.size(44.dp),
                                 )
                                 Spacer(Modifier.width(12.dp))
                                 Column {
-                                    Text(tap.win.app.ui.S.appName, color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp)
+                                    Text(tap.win.app.ui.S.appName(), color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp)
                                     Text("@${user.username}", color = Color.White.copy(alpha = 0.6f), fontSize = 13.sp)
                                 }
                             }
                             Spacer(Modifier.height(24.dp))
                             listOf(
-                                NavItem(0, tap.win.app.ui.S.home, Icons.Filled.Home),
-                                NavItem(1, tap.win.app.ui.S.profile, Icons.Filled.Person),
-                                NavItem(2, tap.win.app.ui.S.security, Icons.Filled.Lock),
-                                NavItem(3, tap.win.app.ui.S.settings, Icons.Filled.Settings),
+                                NavItem(0, tap.win.app.ui.S.home(), Icons.Filled.Home),
+                                NavItem(1, tap.win.app.ui.S.profile(), Icons.Filled.Person),
+                                NavItem(2, tap.win.app.ui.S.security(), Icons.Filled.Lock),
+                                NavItem(3, tap.win.app.ui.S.settings(), Icons.Filled.Settings),
                             ).forEach { item ->
                                 NavigationDrawerItem(
                                     label = { Text(item.title, color = Color.White) },
@@ -201,7 +201,7 @@ fun HomeScreen(session: SessionStore, user: User, onLogout: () -> Unit) {
                             }) {
                                 Icon(Icons.Filled.ExitToApp, contentDescription = null, tint = Color.White)
                                 Spacer(Modifier.width(8.dp))
-                                Text(tap.win.app.ui.S.logout, color = Color.White)
+                                Text(tap.win.app.ui.S.logout(), color = Color.White)
                             }
                         }
                     }
@@ -221,7 +221,7 @@ fun HomeScreen(session: SessionStore, user: User, onLogout: () -> Unit) {
                                         "Bearer ${session.accessToken}",
                                         mapOf("full_name" to newName, "phone" to newPhone),
                                     )
-                                    msg = if (res.isSuccessful) tap.win.app.ui.S.savedOk else errorMessage(res)
+                                    msg = if (res.isSuccessful) tap.win.app.ui.S.savedOk() else errorMessage(res)
                                 }
                             }
                             2 -> SecurityTab(oldPass, newPass,
@@ -231,7 +231,7 @@ fun HomeScreen(session: SessionStore, user: User, onLogout: () -> Unit) {
                                         "Bearer ${session.accessToken}",
                                         mapOf("current_password" to oldPass, "new_password" to newPass),
                                     )
-                                    msg = if (res.isSuccessful) tap.win.app.ui.S.passwordChanged else errorMessage(res)
+                                    msg = if (res.isSuccessful) tap.win.app.ui.S.passwordChanged() else errorMessage(res)
                                 }
                             }
                             3 -> SettingsTab()
@@ -270,10 +270,10 @@ private fun StatTile(title: String, value: String, icon: androidx.compose.ui.gra
 private fun OverviewTab(user: User) {
     
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        StatTile(tap.win.app.ui.S.statusEmail, user.email, Icons.Filled.MailOutline)
-        StatTile(tap.win.app.ui.S.statusUsername, "@${user.username}", Icons.Filled.AccountCircle)
-        StatTile(tap.win.app.ui.S.statusConnection, tap.win.app.ui.S.statusActive, Icons.Filled.SettingsRemote)
-        StatTile(tap.win.app.ui.S.statusJoined, user.lastLoginAt?.take(10) ?: "-", Icons.Filled.DateRange)
+        StatTile(tap.win.app.ui.S.statusEmail(), user.email, Icons.Filled.MailOutline)
+        StatTile(tap.win.app.ui.S.statusUsername(), "@${user.username}", Icons.Filled.AccountCircle)
+        StatTile(tap.win.app.ui.S.statusConnection(), tap.win.app.ui.S.statusActive(), Icons.Filled.SettingsRemote)
+        StatTile(tap.win.app.ui.S.statusJoined(), user.lastLoginAt?.take(10) ?: "-", Icons.Filled.DateRange)
     }
 }
 
@@ -285,14 +285,14 @@ private fun ProfileTab(
     
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         GlassCard {
-            Text(tap.win.app.ui.S.editProfile, color = Color.White, fontWeight = FontWeight.Bold)
+            Text(tap.win.app.ui.S.editProfile(), color = Color.White, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(12.dp))
-            AuthTextField(name, onName, tap.win.app.ui.S.fullName, Icons.Filled.Person)
+            AuthTextField(name, onName, tap.win.app.ui.S.fullName(), Icons.Filled.Person)
             Spacer(Modifier.height(10.dp))
-            AuthTextField(phone, onPhone, tap.win.app.ui.S.phone, Icons.Filled.Phone,
+            AuthTextField(phone, onPhone, tap.win.app.ui.S.phone(), Icons.Filled.Phone,
                 keyboardType = androidx.compose.ui.text.input.KeyboardType.Phone)
             Spacer(Modifier.height(14.dp))
-            GradientButton(tap.win.app.ui.S.save, onClick = { onSave(name, phone) })
+            GradientButton(tap.win.app.ui.S.save(), onClick = { onSave(name, phone) })
         }
     }
 }
@@ -305,13 +305,13 @@ private fun SecurityTab(
     
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         GlassCard {
-            Text(tap.win.app.ui.S.changePassword, color = Color.White, fontWeight = FontWeight.Bold)
+            Text(tap.win.app.ui.S.changePassword(), color = Color.White, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(12.dp))
-            AuthTextField(oldPass, onOld, tap.win.app.ui.S.currentPassword, Icons.Filled.Lock, isPassword = true)
+            AuthTextField(oldPass, onOld, tap.win.app.ui.S.currentPassword(), Icons.Filled.Lock, isPassword = true)
             Spacer(Modifier.height(10.dp))
-            AuthTextField(newPass, onNew, tap.win.app.ui.S.newPassword, Icons.Filled.Lock, isPassword = true)
+            AuthTextField(newPass, onNew, tap.win.app.ui.S.newPassword(), Icons.Filled.Lock, isPassword = true)
             Spacer(Modifier.height(14.dp))
-            GradientButton(tap.win.app.ui.S.updatePassword, onClick = onChange)
+            GradientButton(tap.win.app.ui.S.updatePassword(), onClick = onChange)
         }
     }
 }
@@ -323,16 +323,16 @@ private fun SettingsTab() {
     val ctx = LocalContext.current
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         GlassCard {
-            Text(tap.win.app.ui.S.settingsGeneral, color = Color.White, fontWeight = FontWeight.Bold)
+            Text(tap.win.app.ui.S.settingsGeneral(), color = Color.White, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(12.dp))
-            SettingRow(Icons.Filled.Info, tap.win.app.ui.S.appVersion, tap.win.app.ui.S.versionValue)
-            SettingRow(Icons.Filled.Info, tap.win.app.ui.S.t("حزمة التطبيق", "Package"), tap.win.app.ui.S.packageId)
-            SettingRow(Icons.Filled.Cloud, tap.win.app.ui.S.backendUrl, BuildConfig.API_BASE_URL)
+            SettingRow(Icons.Filled.Info, tap.win.app.ui.S.appVersion(), tap.win.app.ui.S.versionValue())
+            SettingRow(Icons.Filled.Info, tap.win.app.ui.S.t("حزمة التطبيق", "Package"), tap.win.app.ui.S.packageId())
+            SettingRow(Icons.Filled.Cloud, tap.win.app.ui.S.backendUrl(), BuildConfig.API_BASE_URL)
         }
         GlassCard {
-            Text(tap.win.app.ui.S.language, color = Color.White, fontWeight = FontWeight.Bold)
+            Text(tap.win.app.ui.S.language(), color = Color.White, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(6.dp))
-            Text(tap.win.app.ui.S.switchLangNote, color = Color.White.copy(alpha = 0.6f), fontSize = 13.sp)
+            Text(tap.win.app.ui.S.switchLangNote(), color = Color.White.copy(alpha = 0.6f), fontSize = 13.sp)
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 LangChip(tap.win.app.ui.S.arabic, !I18n.english()) {
@@ -346,9 +346,9 @@ private fun SettingsTab() {
             }
         }
         GlassCard {
-            Text(tap.win.app.ui.S.settingsAppearance, color = Color.White, fontWeight = FontWeight.Bold)
+            Text(tap.win.app.ui.S.settingsAppearance(), color = Color.White, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
-            Text(tap.win.app.ui.S.themeNote, color = Color.White.copy(alpha = 0.7f), fontSize = 13.sp)
+            Text(tap.win.app.ui.S.themeNote(), color = Color.White.copy(alpha = 0.7f), fontSize = 13.sp)
         }
     }
 }

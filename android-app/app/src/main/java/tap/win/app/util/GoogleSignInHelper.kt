@@ -227,7 +227,7 @@ object GoogleSignInHelper {
                 .signInWithCredential(GoogleAuthProvider.getCredential(idToken, null))
                 .await()
             val firebaseUser = firebaseResult.user
-                ?: return Result.failure(Exception(tap.win.app.ui.S.firebaseShaHint))
+                ?: return Result.failure(Exception(tap.win.app.ui.S.firebaseShaHint()))
 
             // 2) Send the Firebase ID token to our backend to get a Tap Win session.
             // Task<GetTokenResult>.await() returns GetTokenResult directly; its `.token` is the string.

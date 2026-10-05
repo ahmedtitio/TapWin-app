@@ -186,7 +186,7 @@ private fun SessionSplash() {
                 )
                 Spacer(Modifier.height(14.dp))
                 Text(
-                    tap.win.app.ui.S.restoringSession,
+                    tap.win.app.ui.S.restoringSession(),
                     color = Color.White.copy(alpha = 0.75f),
                     fontSize = 14.sp,
                 )
