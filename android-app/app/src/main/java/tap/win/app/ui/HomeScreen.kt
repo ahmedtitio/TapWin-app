@@ -1,5 +1,6 @@
 package tap.win.app.ui
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -65,13 +66,10 @@ fun HomeScreen(session: SessionStore, user: User, onLogout: () -> Unit) {
         var newPass by remember { mutableStateOf("") }
 
         val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
-        val scaffoldState = rememberScaffoldState(drawerState = drawerState)
+
         
 
         Scaffold(
-            scaffoldState = scaffoldState,
-            backgroundColor = Color.Black,
-            contentColor = Color.White,
             topBar = {
                 TopAppBar(
                     title = {
@@ -328,7 +326,7 @@ private fun SettingsTab() {
             Text(tap.win.app.ui.S.settingsGeneral, color = Color.White, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(12.dp))
             SettingRow(Icons.Filled.Info, tap.win.app.ui.S.appVersion, tap.win.app.ui.S.versionValue)
-            SettingRow(Icons.Filled.Package, tap.win.app.ui.S.t("حزمة التطبيق", "Package"), tap.win.app.ui.S.packageId)
+            SettingRow(Icons.Filled.Info, tap.win.app.ui.S.t("حزمة التطبيق", "Package"), tap.win.app.ui.S.packageId)
             SettingRow(Icons.Filled.Cloud, tap.win.app.ui.S.backendUrl, BuildConfig.API_BASE_URL)
         }
         GlassCard {
