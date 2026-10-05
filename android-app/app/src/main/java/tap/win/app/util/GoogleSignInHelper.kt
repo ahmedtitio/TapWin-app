@@ -143,6 +143,23 @@ object GoogleSignInHelper {
         }
     }
 
+    /**
+     * Reads the `aud` claim from a JWT without any third-party library.
+     * Returns null when the token can't be parsed (never throws).
+     */
+    private fun tokenAudience(jwt: String?): String? {
+        if (jwt.isNullOrBlank()) return null
+        return try {
+            val payloadPart = jwt.split('.').getOrNull(1) ?: return null
+            val padded = payloadPart.replace('-', '+').replace('_', '/') +
+                "=".repeat((4 - payloadPart.length % 4) % 4)
+            val json = String(android.util.Base64.decode(padded, android.util.Base64.DEFAULT))
+            org.json.JSONObject(json).optString("aud").ifBlank { null }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     /** Reads the IntentSender out of a PendingIntent reflectively (compile-safe on all 21.x). */
     private fun extractIntentSender(pendingIntent: Any): android.content.IntentSender? {
         return try {
@@ -168,13 +185,32 @@ object GoogleSignInHelper {
             // play-services-auth >= 21.4; on other versions fall back to the classic
             // GoogleSignInAccount path. Both branches use reflection-free APIs that are
             // present in every 21.x release, so compilation never fails.
-            val idToken = extractIdToken(activity, data)
-                ?: runCatching { forceAccountToken(activity) }.getOrNull()
-                ?: return Result.failure(
+            val freshToken = extractIdToken(activity, data)
+            // Cached/silent tokens may still be issued to a deleted OAuth client
+            // (stale aud). Only fall back to them if the fresh token is missing or
+            // its audience doesn't match the configured web client id.
+            val cachedToken = runCatching { forceAccountToken(activity) }.getOrNull()
+            val expectedAud = BuildConfig.GOOGLE_WEB_CLIENT_ID
+            val idToken = when {
+                freshToken != null && tokenAudience(freshToken) == expectedAud -> freshToken
+                cachedToken != null && tokenAudience(cachedToken) == expectedAud -> cachedToken
+                freshToken != null -> freshToken
+                cachedToken != null -> cachedToken
+                else -> null
+            } ?: return Result.failure(
+                Exception(
+                    "تعذّر الحصول على رمز Google من شاشة اختيار الحساب — جرّب مرة أخرى وتأكد من تسجيل الدخول بحسابك في إعدادات Google على الجهاز.",
+                ),
+            )
+            val aud = tokenAudience(idToken)
+            if (aud != null && expectedAud.isNotBlank() && aud != expectedAud) {
+                android.util.Log.e("TapWin", "GOOGLE_AUD_MISMATCH got=$aud expected=$expectedAud")
+                return Result.failure(
                     Exception(
-                        "تعذّر الحصول على رمز Google من شاشة اختيار الحساب — جرّب مرة أخرى وتأكد من تسجيل الدخول بحسابك في إعدادات Google على الجهاز.",
+                        "رمز Google صادر عن إعداد عميل قديم (aud=$aud). امحُ بيانات التطبيق أو سجّل الخروج ثم أعد المحاولة بعد تثبيت نسخة محدّثة.",
                     ),
                 )
+            }
 
             // Primary path: send the raw Google ID token straight to our backend,
             // which verifies it against Google's public keys. This works even when
@@ -231,9 +267,18 @@ object GoogleSignInHelper {
         val msg = runCatching {
             response.errorBody()?.string()?.let { body ->
                 val j = org.json.JSONObject(body)
-                // Prefer the specific Arabic message from the backend; fall back to code.
-                j.optString("message").ifBlank { null } ?: j.optString("code").ifBlank { null }
+                // Surface the exact verification reason + audience diagnostics so a
+                // stale-token problem is identifiable from the UI without logcat.
+                val code = j.optString("code").ifBlank { null }
+                val debugAud = j.optJSONObject("debug")?.optString("received_aud")
+                    ?.trim('"')?.ifBlank { null }
+                val base = j.optString("message").ifBlank { null }
                     ?: j.optString("error").ifBlank { null }
+                when {
+                    base != null && code != null && debugAud != null -> "$base ($code · aud=$debugAud)"
+                    base != null && code != null -> "$base ($code)"
+                    else -> base
+                }
             }
         }.getOrNull()
         throw Exception(msg ?: "فشل تسجيل الدخول عبر الخادم (${response.code()})")

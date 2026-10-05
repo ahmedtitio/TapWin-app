@@ -400,6 +400,9 @@ async function verifyGoogleIdToken(idToken) {
   const h = decode(segs[0]);
   const p = decode(segs[1]);
 
+  // TEMP DIAGNOSTIC: echo the received audience so we can pinpoint stale tokens.
+  verifyGoogleIdToken._lastAud = JSON.stringify(p.aud);
+
   if (h.alg !== 'RS256' || !h.kid) throw new Error('BAD_TOKEN_FORMAT');
   // Accept any OAuth client id belonging to our project as audience:
   // Credential-API tokens are aud=Web client; classic GoogleSignIn tokens may
@@ -478,7 +481,12 @@ router.post('/firebase', async (req, res) => {
           UNKNOWN_KID: 'تعذر العثور على مفتاح عام لرمز Google — حاول مرة أخرى',
           BAD_SIGNATURE: 'توقيع رمز Google غير صالح',
         };
-        return res.status(401).json({ error: 'INVALID_GOOGLE_TOKEN', code: reason, message: messages[reason] || 'تعذر التحقق من حساب Google' });
+        return res.status(401).json({
+          error: 'INVALID_GOOGLE_TOKEN', code: reason,
+          // TEMP DIAGNOSTIC: received aud + allowlist size to pinpoint stale-client tokens.
+          debug: { received_aud: verifyGoogleIdToken._lastAud || null, allowlist_size: GOOGLE_ALLOWED_AUDIENCES.size },
+          message: messages[reason] || 'تعذر التحقق من حساب Google',
+        });
       }
       fp.user_id = fp.sub;
     }
