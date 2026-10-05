@@ -1,9 +1,9 @@
 package tap.win.app
 
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
@@ -19,6 +19,7 @@ import tap.win.app.data.SessionStore
 import tap.win.app.ui.AuthMode
 import tap.win.app.ui.AuthScreen
 import tap.win.app.ui.HomeScreen
+import tap.win.app.util.I18n
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
@@ -42,6 +43,15 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
 
     private lateinit var session: SessionStore
+
+    override fun attachBaseContext(newBase: Context) {
+        // Apply the persisted app language (Arabic default / English) before any
+        // UI is inflated, so resources & RTL direction follow it from the start.
+        I18n.load(newBase)
+        val config = newBase.resources.configuration
+        config.setLocale(I18n.locale())
+        super.attachBaseContext(newBase.createConfigurationContext(config))
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

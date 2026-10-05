@@ -56,6 +56,8 @@ async function buildApp(env) {
     APP_URL: env.APP_URL,
     FIREBASE_PROJECT_ID: env.FIREBASE_PROJECT_ID,
     RESEND_API_KEY: env.RESEND_API_KEY,
+    GOOGLE_WEB_CLIENT_ID: env.GOOGLE_WEB_CLIENT_ID,
+    GOOGLE_ANDROID_CLIENT_ID: env.GOOGLE_ANDROID_CLIENT_ID,
     NODE_ENV: 'production',
   });
 

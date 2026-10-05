@@ -17,13 +17,25 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // All OAuth client ids belonging to project tapwin-app that may appear as the
 // `aud` of a Google ID token issued to this app (Web client used by the Credential
 // API; env vars add any Android/legacy clients). Overridable via env.
-const GOOGLE_ALLOWED_AUDIENCES = new Set([
-  '777921904281-qqsntmbbps23hcq51tfjts8s2gmajb19.apps.googleusercontent.com', // Web client (current, auto-created by Google Service)
-  '777921904281-h10gclmq1nif0nalavjdjkgk5sbn6un1.apps.googleusercontent.com', // Android client (package tap.win.app, SHA-1 0B:23:22:C0:...)
-  '777921904281-9udm9ghsbn7r2f5dpu9h8a1sem2rq73u.apps.googleusercontent.com', // Legacy web client id (older google-services.json / cached tokens)
-].filter(Boolean));
-for (const v of [process.env.GOOGLE_WEB_CLIENT_ID, process.env.GOOGLE_ANDROID_CLIENT_ID]) {
-  if (v) String(v).split(',').map((s) => s.trim()).filter(Boolean).forEach((x) => GOOGLE_ALLOWED_AUDIENCES.add(x));
+// NOTE: this set is intentionally EMPTY at module load. The worker's fetch()
+// handler copies env vars into process.env right before routing each request,
+// so the allowlist must be built lazily at verification time — a module-load
+// snapshot would always be empty (env isn't populated yet), which was the
+// root cause of every INVALID_GOOGLE_TOKEN / BAD_AUDIENCE rejection.
+const GOOGLE_ALLOWED_AUDIENCES = new Set();
+let googleAudiencesBuiltFor = null;
+function buildGoogleAudiences() {
+  const snapshot = [
+    process.env.GOOGLE_WEB_CLIENT_ID,
+    process.env.GOOGLE_ANDROID_CLIENT_ID,
+  ].join('|');
+  if (snapshot !== googleAudiencesBuiltFor) {
+    googleAudiencesBuiltFor = snapshot;
+    for (const v of [process.env.GOOGLE_WEB_CLIENT_ID, process.env.GOOGLE_ANDROID_CLIENT_ID]) {
+      if (v) String(v).split(',').map((s) => s.trim()).filter(Boolean).forEach((x) => GOOGLE_ALLOWED_AUDIENCES.add(x));
+    }
+  }
+  return GOOGLE_ALLOWED_AUDIENCES;
 }
 const pwIssue = (p) => {
   if (!p || p.length < 8) return 'كلمة السر يجب أن تكون 8 أحرف على الأقل';
@@ -408,8 +420,9 @@ async function verifyGoogleIdToken(idToken) {
   // Credential-API tokens are aud=Web client; classic GoogleSignIn tokens may
   // carry a legacy generated client. All are ours (project tapwin-app).
   const audOk = Array.isArray(p.aud) ? p.aud : [p.aud];
-  if (!audOk.some((a) => GOOGLE_ALLOWED_AUDIENCES.has(String(a)))) {
-    console.warn('[auth/google] BAD_AUDIENCE aud=', JSON.stringify(p.aud));
+  if (!audOk.some((a) => buildGoogleAudiences().has(String(a)))) {
+    console.warn('[auth/google] BAD_AUDIENCE aud=', JSON.stringify(p.aud),
+      'allowlist=', JSON.stringify([...GOOGLE_ALLOWED_AUDIENCES]));
     throw new Error('BAD_AUDIENCE');
   }
   if (!p.exp || p.exp * 1000 < Date.now()) throw new Error('TOKEN_EXPIRED');
@@ -495,6 +508,7 @@ router.post('/firebase', async (req, res) => {
     // Find by firebase uid -> by email (link account) -> create new user.
     let { rows } = await query('SELECT * FROM users WHERE firebase_uid=$1', [fp.user_id]);
     let user = rows[0];
+    let isNewUser = false;
 
     if (!user) {
       ({ rows } = await query('SELECT * FROM users WHERE email=$1', [email]));
@@ -506,6 +520,7 @@ router.post('/firebase', async (req, res) => {
     }
 
     if (!user) {
+      isNewUser = true;
       const name = (fp.name || email.split('@')[0]).trim();
       const base = (fp.email.split('@')[0] || 'user').replace(/[^a-zA-Z0-9._]/g, '').toLowerCase() || 'user';
       let username = base, suffix = 1;
@@ -552,7 +567,9 @@ router.post('/firebase', async (req, res) => {
     await storeRefreshToken(user.id, refreshToken, device_id);
     await logLogin(user.id, email, true, req);
 
-    res.json({ user: publicUser, tokens: { accessToken, refreshToken } });
+    // is_new_user lets the app show "تم إنشاء الحساب بنجاح" vs "تم تسجيل الدخول بنجاح"
+    // and prompt for missing profile data on first Google sign-in.
+    res.json({ user: publicUser, tokens: { accessToken, refreshToken }, is_new_user: isNewUser });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'SERVER_ERROR' });

@@ -24,6 +24,7 @@ data class AuthResponse(
     val user: User,
     val tokens: Tokens,
     @SerializedName("email_verified") val emailVerified: Boolean = true,
+    @SerializedName("is_new_user") val isNewUser: Boolean = false,
     val message: String? = null,
     val dev_code: String? = null,
 )

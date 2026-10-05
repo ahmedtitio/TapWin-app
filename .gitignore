@@ -1,27 +1,23 @@
 # Dependencies
 node_modules/
 
-# Environment & Secrets
+# Environment files
 .env
 .env.local
-.env.*.local
-*.log
-CM_KEYSTORE_BASE64.md
-secrets/
-
-# Keystore / signing (must never be committed)
-android-app/tapwin-release.jks
-*.jks
-*.keystore
-
-# Build Artifacts & Caches
+.env.*
+# Build outputs & caches
 dist/
 build/
-.cache/
 .wrangler/
-.gradle/
-local.properties
+.cache/
+*.log
 
-# OS Files
+# Signing & secrets
+*.jks
+*.keystore
+secrets/
+local.properties
+codemagic-signing*
+
+# OS
 .DS_Store
-Thumbs.db
