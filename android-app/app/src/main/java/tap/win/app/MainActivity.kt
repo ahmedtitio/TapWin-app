@@ -113,21 +113,21 @@ class MainActivity : ComponentActivity() {
 /** Branded splash shown while a saved session is being restored. */
 @androidx.compose.runtime.Composable
 private fun SessionSplash() {
-    // Gentle pulse for the logo + indeterminate loader while refresh runs.
-    val pulse = androidx.compose.animation.core.rememberAnimatable(0f)
+    // Gentle pulse for the logo while refresh runs. Uses only APIs that exist
+    // in every Compose release: animateFloatAsState + remember/LaunchedEffect
+    // state flip (rememberAnimatable is NOT available in this project's version).
+    var pulseTarget by remember { mutableStateOf(false) }
     androidx.compose.runtime.LaunchedEffect(Unit) {
         while (true) {
-            pulse.animateTo(
-                targetValue = 1f,
-                animationSpec = androidx.compose.animation.core.tween(durationMillis = 1100),
-            )
-            pulse.animateTo(
-                targetValue = 0f,
-                animationSpec = androidx.compose.animation.core.tween(durationMillis = 1100),
-            )
+            kotlinx.coroutines.delay(1100L)
+            pulseTarget = !pulseTarget
         }
     }
-    val scale = 0.92f + 0.08f * pulse.value
+    val pulseValue = androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (pulseTarget) 1f else 0f,
+        animationSpec = androidx.compose.animation.core.tween(durationMillis = 1100),
+    )
+    val scale = 0.92f + 0.08f * pulseValue.value
 
     Surface(
         color = Color(0xFF120B33),
